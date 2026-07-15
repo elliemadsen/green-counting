@@ -2,19 +2,31 @@
 Syllabi Semantic Analysis — Diachronic Word Embedding Study
 ===========================================================
 Trains a Word2Vec model per year-slice, aligns vector spaces via
-orthogonal Procrustes (Hamilton et al. 2016), then produces:
+orthogonal Procrustes (Hamilton et al. 2016), then produces — for
+whichever keyword set is selected with --keywords — the outputs listed
+below under outputs/keywords-<1|2>/:
 
-  1. Nearest-neighbour tables for target terms per year
-  2. Semantic shift magnitude scores
-  3. Per-year landscape PNGs + per-subdir GIF:
-       keywords_nearest_neighbors/ — keywords + NNs (top-500 limited)
-       keywords/                   — 30 keywords only (dark grey)
-       keywords_top100/            — top-100 words, keywords highlighted
-       keywords_top500/            — top-500 words, keywords highlighted
-  4. Topographic concentric diagrams (top-500 limited) → concentric_diagrams/
-  5. Semantic trajectory plot
+  nearest_neighbours.csv    Top-N nearest neighbours per keyword per year
+                            (candidates limited to the top-500 corpus words)
+  semantic_shift_bar.png    Cosine-distance magnitude of each keyword,
+                            first year → last year
+  term_trajectories.png     Path each keyword's embedding took year by year,
+                            in the shared 2-D PCA space
+  nearest-neighbors/        Per-year landscape: keywords + their NNs
+  go-words/                 Per-year landscape: keywords (red) + go-words (grey)
+  top-100/, top-200/,       Per-year landscape: top-N corpus words,
+  top-500/                  keywords highlighted
+  umap/                     Aggregate (non-annual) UMAP view of the same
+                            five word sets above
+  concentric-diagrams/      One ring diagram per keyword, one panel per year;
+                            neighbours are drawn only from the go-words list
+
+Run with --keywords 1 or --keywords 2 to select data/keywords.txt or
+data/keywords-2.txt (default: 2). Toggle individual outputs on/off via the
+OUTPUTS dict below (e.g. set OUTPUTS["top100_landscape"] = False).
 """
 
+import argparse
 import math
 import re
 import warnings
@@ -39,15 +51,39 @@ matplotlib.rcParams["font.weight"] = "normal"
 
 warnings.filterwarnings("ignore")
 
+# ── CLI ──────────────────────────────────────────────────────────────────────
+parser = argparse.ArgumentParser(description="Diachronic word-embedding semantic analysis")
+parser.add_argument("--keywords", choices=["1", "2"], default="2",
+                     help="Keyword set to analyze: 1 = data/keywords.txt, "
+                          "2 = data/keywords-2.txt. Output goes to "
+                          "outputs/keywords-<N>/. Default: 2")
+args = parser.parse_args()
+KEYWORD_SET = args.keywords
+
+# ── Output toggles ─────────────────────────────────────────────────────────────
+# Flip any of these to False to skip generating that output on the next run.
+OUTPUTS = {
+    "nearest_neighbours_csv":   True,
+    "semantic_shift_bar":       True,
+    "term_trajectories":        True,
+    "nearest_neighbors_landscape": True,
+    "go_words_landscape":       True,
+    "top100_landscape":         True,
+    "top200_landscape":         True,
+    "top500_landscape":         True,
+    "umap_aggregate":           True,
+    "concentric_diagrams":      True,
+}
+
 # ── Config ─────────────────────────────────────────────────────────────────────
 BASE_DIR      = pathlib.Path(__file__).parent
 DATA_PATH     = BASE_DIR.parent / "data" / "syllabi_text.csv"
-KEYWORDS_FILE  = BASE_DIR.parent / "data" / "keywords.txt"
-KEYWORDS_FILE_2 = BASE_DIR.parent / "data" / "keywords-2.txt"
+KEYWORDS_FILE = BASE_DIR.parent / "data" / (
+    "keywords.txt" if KEYWORD_SET == "1" else "keywords-2.txt")
 TOP500_CSV    = BASE_DIR.parent / "0_preprocessing" / "outputs" / "top500_corpus.csv"
 OUT_DIR       = BASE_DIR / "outputs"
 
-KW_DIR               = OUT_DIR / "keywords"
+KW_DIR               = OUT_DIR / f"keywords-{KEYWORD_SET}"
 LANDSCAPE_NN_KW_DIR  = KW_DIR / "nearest-neighbors"
 LANDSCAPE_KW_DIR     = KW_DIR / "go-words"
 LANDSCAPE_TOP100_DIR = KW_DIR / "top-100"
@@ -59,7 +95,7 @@ UMAP_DIR             = KW_DIR / "umap"
 for _d in [OUT_DIR, KW_DIR, LANDSCAPE_NN_KW_DIR, LANDSCAPE_KW_DIR,
            LANDSCAPE_TOP100_DIR, LANDSCAPE_TOP200_DIR,
            LANDSCAPE_TOP500_DIR, CONC_DIAG_DIR, UMAP_DIR]:
-    _d.mkdir(exist_ok=True)
+    _d.mkdir(parents=True, exist_ok=True)
 
 W2V_PARAMS = dict(
     vector_size=100, window=8, min_count=3,
@@ -68,16 +104,15 @@ W2V_PARAMS = dict(
 
 TOP_N          = 12    # NNs per term for ring diagrams (4 words × 3 rings)
 KW_NN_N        = 20    # NNs per keyword alias for landscape
-TOP_WORDS_N    = 100   # corpus-wide top words for keywords_top100
-TOP200_WORDS_N = 200   # corpus-wide top words for keywords_top200
-MIN_FREQ       = 50    # within-year frequency floor (used for top100/top500 landscapes)
+TOP_WORDS_N    = 100   # corpus-wide top words for top-100 landscape
+TOP200_WORDS_N = 200   # corpus-wide top words for top-200 landscape
+MIN_FREQ       = 50    # within-year frequency floor (used for top100/200/500 landscapes)
 TARGET_COLOR   = "#c0392b"   # red — keywords in landscapes
-KEYWORDS_COLOR = "#444444"   # dark grey (kept for backwards compat)
 GO_WORDS_COLOR = "#888888"   # grey — go-words in combined landscape
 GO_WORDS_FILE  = BASE_DIR.parent / "data" / "go-words.txt"
 
 ENABLE_REPULSION = True   # push labels apart to reduce overlap in landscape outputs
-_REPEL_ITERS     = 20     # max iterations of the repulsion loop
+_REPEL_ITERS     = 40     # max iterations of the repulsion loop
 _REPEL_STEP      = 0.5    # fraction of each overlap resolved per iteration
 
 # ── Load keywords ──────────────────────────────────────────────────────────────
@@ -114,12 +149,8 @@ def parse_go_words_file(path: pathlib.Path) -> list[tuple[str, list[str]]]:
 keyword_groups = parse_keywords(KEYWORDS_FILE)
 TARGET_TERMS   = [label for label, _ in keyword_groups]
 KW_ALL_ALIASES = set(a for _, aliases in keyword_groups for a in aliases)
-print(f"Loaded {len(keyword_groups)} keyword groups: {TARGET_TERMS}")
-
-keyword_groups_2 = parse_keywords(KEYWORDS_FILE_2)
-TARGET_TERMS_2   = [label for label, _ in keyword_groups_2]
-KW_ALL_ALIASES_2 = set(a for _, aliases in keyword_groups_2 for a in aliases)
-print(f"Loaded {len(keyword_groups_2)} keyword-2 groups: {TARGET_TERMS_2}")
+print(f"Keyword set {KEYWORD_SET} ({KEYWORDS_FILE.name}): "
+      f"{len(keyword_groups)} groups: {TARGET_TERMS}")
 
 gw_groups       = parse_go_words_file(GO_WORDS_FILE)
 TARGET_TERMS_GW = [label for label, _ in gw_groups]
@@ -204,8 +235,10 @@ def align_to_reference(source: Word2Vec, ref: Word2Vec) -> dict[str, np.ndarray]
         return {}
     A = np.array([source.wv[w] for w in shared])
     B = np.array([ref.wv[w]    for w in shared])
-    A /= np.linalg.norm(A, axis=0, keepdims=True) + 1e-9
-    B /= np.linalg.norm(B, axis=0, keepdims=True) + 1e-9
+    # Normalise each word vector (row) to unit length before finding the
+    # rotation, so Procrustes aligns on direction rather than magnitude.
+    A /= np.linalg.norm(A, axis=1, keepdims=True) + 1e-9
+    B /= np.linalg.norm(B, axis=1, keepdims=True) + 1e-9
     R, _ = orthogonal_procrustes(A, B)
     out: dict[str, np.ndarray] = {}
     for word in source.wv.index_to_key:
@@ -223,56 +256,41 @@ def cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
     d = np.linalg.norm(a) * np.linalg.norm(b)
     return float(np.dot(a, b) / d) if d > 1e-9 else 0.0
 
-def nearest_neighbours(word: str, vecs: dict[str, np.ndarray],
-                        n: int = TOP_N) -> list[tuple[str, float]]:
+def nearest_neighbours(word: str, vecs: dict[str, np.ndarray], n: int = TOP_N,
+                        restrict_to: set[str] | None = None) -> list[tuple[str, float]]:
+    """NNs for `word`. If `restrict_to` is given, candidates are limited to it."""
     if word not in vecs:
         return []
     wv = vecs[word]
-    sims = [(w, cosine_sim(wv, v)) for w, v in vecs.items() if w != word]
+    items = vecs.items() if restrict_to is None else (
+        (w, v) for w, v in vecs.items() if w in restrict_to)
+    sims = [(w, cosine_sim(wv, v)) for w, v in items if w != word]
     sims.sort(key=lambda x: -x[1])
     return sims[:n]
 
-def nearest_neighbours_top500(word: str, vecs: dict[str, np.ndarray],
-                               n: int = TOP_N) -> list[tuple[str, float]]:
-    """NNs restricted to top-500 corpus words."""
-    if word not in vecs:
-        return []
-    wv = vecs[word]
-    sims = [(w, cosine_sim(wv, v)) for w, v in vecs.items()
-            if w != word and w in top_500_set]
-    sims.sort(key=lambda x: -x[1])
-    return sims[:n]
-
-# ── 5. Compute NNs for all target terms (top-500 filtered) ────────────────────
+# ── 5. Compute NNs for target terms (top-500 filtered) ────────────────────────
 print("\n" + "=" * 70)
-print("NEAREST NEIGHBOURS BY YEAR  (limited to top-500 corpus words)")
+print(f"NEAREST NEIGHBOURS BY YEAR — keywords-{KEYWORD_SET} (limited to top-500 corpus words)")
 print("=" * 70)
 
 nn_results: dict[str, dict[int, list]] = defaultdict(dict)
 for term in TARGET_TERMS:
     print(f"\n── {term.upper()} ──")
     for yr in years:
-        nns = nearest_neighbours_top500(term, aligned_vecs[yr])
+        nns = nearest_neighbours(term, aligned_vecs[yr], restrict_to=top_500_set)
         nn_results[term][yr] = nns
         if nns:
             print(f"  {yr}: {', '.join(w for w, _ in nns)}")
         else:
             print(f"  {yr}: (not in vocabulary / no top-500 NNs)")
 
-print("\n" + "=" * 70)
-print("NEAREST NEIGHBOURS BY YEAR  (keywords-2, limited to top-500 corpus words)")
-print("=" * 70)
-
-nn_results_2: dict[str, dict[int, list]] = defaultdict(dict)
-for term in TARGET_TERMS_2:
-    print(f"\n── {term.upper()} ──")
+# NNs restricted to the go-words list, used only for the concentric diagrams
+print("\nComputing go-words-restricted NNs for concentric diagrams …")
+nn_results_conc: dict[str, dict[int, list]] = defaultdict(dict)
+for term in TARGET_TERMS:
     for yr in years:
-        nns = nearest_neighbours_top500(term, aligned_vecs[yr])
-        nn_results_2[term][yr] = nns
-        if nns:
-            print(f"  {yr}: {', '.join(w for w, _ in nns)}")
-        else:
-            print(f"  {yr}: (not in vocabulary / no top-500 NNs)")
+        nn_results_conc[term][yr] = nearest_neighbours(
+            term, aligned_vecs[yr], restrict_to=GW_ALL_ALIASES)
 
 # ── 6. Semantic shift scores (magnitude only) ──────────────────────────────────
 print("\n" + "=" * 70)
@@ -291,45 +309,25 @@ for term in TARGET_TERMS:
     else:
         print(f"  {term:20s}  (missing in {first_yr} or {last_yr})")
 
-print("\nSEMANTIC SHIFT SCORES  (keywords-2, cosine distance magnitude, first → last year)")
-shift_scores_2: dict[str, float] = {}
-for term in TARGET_TERMS_2:
-    v0 = aligned_vecs[first_yr].get(term)
-    v1 = aligned_vecs[last_yr].get(term)
-    if v0 is not None and v1 is not None:
-        dist = cosine(v0, v1)
-        shift_scores_2[term] = dist
-        print(f"  {term:20s}  |Δ| = {dist:.4f}")
-    else:
-        print(f"  {term:20s}  (missing in {first_yr} or {last_yr})")
-
 # ── 7. Save NN table CSV ───────────────────────────────────────────────────────
-nn_rows = []
-for term in TARGET_TERMS:
-    for yr in years:
-        for rank, (word, sim) in enumerate(nn_results[term][yr], 1):
-            nn_rows.append({"target": term, "year": yr, "rank": rank,
-                             "neighbour": word, "cosine_sim": round(sim, 4)})
-pd.DataFrame(nn_rows).to_csv(KW_DIR / "nearest_neighbours.csv", index=False)
-print(f"\nNearest-neighbour table → {KW_DIR / 'nearest_neighbours.csv'}")
-
-nn2_rows = []
-for term in TARGET_TERMS_2:
-    for yr in years:
-        for rank, (word, sim) in enumerate(nn_results_2[term][yr], 1):
-            nn2_rows.append({"target": term, "year": yr, "rank": rank,
-                              "neighbour": word, "cosine_sim": round(sim, 4)})
-pd.DataFrame(nn2_rows).to_csv(OUT_DIR_2 / "nearest_neighbours.csv", index=False)
-print(f"Nearest-neighbour-2 table → {OUT_DIR_2 / 'nearest_neighbours.csv'}")
+if OUTPUTS["nearest_neighbours_csv"]:
+    nn_rows = []
+    for term in TARGET_TERMS:
+        for yr in years:
+            for rank, (word, sim) in enumerate(nn_results[term][yr], 1):
+                nn_rows.append({"target": term, "year": yr, "rank": rank,
+                                 "neighbour": word, "cosine_sim": round(sim, 4)})
+    pd.DataFrame(nn_rows).to_csv(KW_DIR / "nearest_neighbours.csv", index=False)
+    print(f"\nNearest-neighbour table → {KW_DIR / 'nearest_neighbours.csv'}")
 
 # ── 8. Semantic shift magnitude bar chart ─────────────────────────────────────
-if shift_scores:
+if OUTPUTS["semantic_shift_bar"] and shift_scores:
     terms_sorted = sorted(shift_scores, key=shift_scores.get, reverse=True)
     vals    = [shift_scores[t] for t in terms_sorted]
     fig, ax = plt.subplots(figsize=(9, max(4, len(terms_sorted) * 0.35)))
     ax.barh(terms_sorted, vals, color="#555555", edgecolor="white", height=0.6)
-    ax.set_xlabel(f"Cosine distance magnitude ({first_yr} → {last_yr})", fontsize=11)
-    ax.set_title("Semantic Shift Magnitude of Keywords", fontsize=13)
+    ax.set_xlabel(f"Cosine distance magnitude ({first_yr} -> {last_yr})", fontsize=11)
+    ax.set_title(f"Semantic Shift Magnitude of Keywords-{KEYWORD_SET}", fontsize=13)
     ax.axvline(np.mean(vals), color="#aaaaaa", linestyle="--", linewidth=1,
                label=f"Mean ({np.mean(vals):.3f})")
     ax.legend(fontsize=9)
@@ -345,28 +343,6 @@ if shift_scores:
     plt.close()
     print("Shift magnitude bar chart saved")
 
-if shift_scores_2:
-    terms_sorted_2 = sorted(shift_scores_2, key=shift_scores_2.get, reverse=True)
-    vals_2  = [shift_scores_2[t] for t in terms_sorted_2]
-    fig, ax = plt.subplots(figsize=(9, max(4, len(terms_sorted_2) * 0.35)))
-    ax.barh(terms_sorted_2, vals_2, color="#555555", edgecolor="white", height=0.6)
-    ax.set_xlabel(f"Cosine distance magnitude ({first_yr} → {last_yr})", fontsize=11)
-    ax.set_title("Semantic Shift Magnitude of Keywords-2", fontsize=13)
-    ax.axvline(np.mean(vals_2), color="#aaaaaa", linestyle="--", linewidth=1,
-               label=f"Mean ({np.mean(vals_2):.3f})")
-    ax.legend(fontsize=9)
-    for val, term in zip(vals_2, terms_sorted_2):
-        ax.text(val + 0.002, terms_sorted_2.index(term),
-                f"{val:.3f}", va="center", fontsize=9, color="#333333")
-    ax.set_xlim(0, max(vals_2) * 1.25)
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-    ax.tick_params(axis="both", length=0)
-    plt.tight_layout()
-    plt.savefig(OUT_DIR_2 / "semantic_shift_bar.png", dpi=150)
-    plt.close()
-    print("Shift-2 magnitude bar chart saved")
-
 # ── 9. Build shared PCA space ──────────────────────────────────────────────────
 print("\nBuilding shared PCA space …")
 
@@ -379,15 +355,9 @@ for alias in KW_ALL_ALIASES:
             if w in top_500_set and w not in KW_ALL_ALIASES:
                 kw_nn_vocab.add(w)
 
-kw2_nn_vocab: set[str] = set(TARGET_TERMS_2)
-for alias in KW_ALL_ALIASES_2:
-    for yr in years:
-        for w, _ in nearest_neighbours(alias, aligned_vecs[yr], n=KW_NN_N):
-            if w in top_500_set and w not in KW_ALL_ALIASES_2:
-                kw2_nn_vocab.add(w)
-
-# Combined vocabulary (keywords + keywords-2 + go-words + their NNs + top-500 + top-100) for one PCA
-combined_vocab = sorted(kw_nn_vocab | kw2_nn_vocab | set(TARGET_TERMS_GW) | top_500_set | set(top_words))
+# Combined vocabulary (keywords + go-words + their NNs + top-500 + top-100/200) for one PCA
+combined_vocab = sorted(kw_nn_vocab | set(TARGET_TERMS_GW) | top_500_set
+                         | set(top_words) | set(top_200_words))
 print(f"  Combined vocabulary: {len(combined_vocab)} words")
 
 def avg_vec(word: str) -> np.ndarray | None:
@@ -410,25 +380,10 @@ for yr in years:
 print(f"  PCA on {len(valid_vocab)} words — "
       f"{pca.explained_variance_ratio_.sum():.1%} variance explained")
 
-kw_aliases_set  = set(TARGET_TERMS)    # canonical labels only (first form per keywords.txt line)
-kw2_aliases_set = set(TARGET_TERMS_2)  # canonical labels only for keywords-2
-gw_canonical_set = set(TARGET_TERMS_GW) # canonical labels for go-words
-top_words_set   = set(top_words)
-top_200_set     = set(top_200_words)
-
-OUT_DIR_2               = OUT_DIR / "keywords-2"
-LANDSCAPE_NN_KW_DIR_2   = OUT_DIR_2 / "nearest-neighbors"
-LANDSCAPE_KW_DIR_2      = OUT_DIR_2 / "go-words"
-LANDSCAPE_TOP100_DIR_2  = OUT_DIR_2 / "top-100"
-LANDSCAPE_TOP200_DIR_2  = OUT_DIR_2 / "top-200"
-LANDSCAPE_TOP500_DIR_2  = OUT_DIR_2 / "top-500"
-CONC_DIAG_DIR_2         = OUT_DIR_2 / "concentric-diagrams"
-UMAP_DIR_2              = OUT_DIR_2 / "umap"
-
-for _d2 in [OUT_DIR_2, LANDSCAPE_NN_KW_DIR_2, LANDSCAPE_KW_DIR_2,
-            LANDSCAPE_TOP100_DIR_2, LANDSCAPE_TOP200_DIR_2,
-            LANDSCAPE_TOP500_DIR_2, CONC_DIAG_DIR_2, UMAP_DIR_2]:
-    _d2.mkdir(exist_ok=True)
+kw_aliases_set   = set(TARGET_TERMS)     # canonical labels only
+gw_canonical_set = set(TARGET_TERMS_GW)  # canonical labels for go-words
+top_words_set    = set(top_words)
+top_200_set      = set(top_200_words)
 
 # ── 10. Label repulsion helper ────────────────────────────────────────────────
 def repel_labels(positions: dict[str, tuple[float, float]],
@@ -454,6 +409,13 @@ def repel_labels(positions: dict[str, tuple[float, float]],
     hh = np.array([font_sizes.get(w, 7) * pt_to_px * 0.55 + 2.0
                    for w in words])
 
+    # Stable antisymmetric tie-break for (near-)coincident labels: sign(dx) is
+    # ambiguous when two labels sit at almost the same position, and naively
+    # nudging by a fixed epsilon pushes both labels the same way instead of
+    # apart (they then never separate and one fully occludes the other).
+    # Falling back to index order guarantees opposite pushes for any pair.
+    idx_tiebreak = np.sign(np.arange(n)[:, None] - np.arange(n)[None, :])
+
     for _ in range(_REPEL_ITERS):
         # Pairwise displacement matrices: dx[i,j] = x_i - x_j
         dx = pos[:, 0][:, None] - pos[:, 0][None, :]  # (n, n)
@@ -468,9 +430,12 @@ def repel_labels(positions: dict[str, tuple[float, float]],
         if not mask.any():
             break
 
+        dx_dir = np.where(np.abs(dx) > 1e-6, np.sign(dx), idx_tiebreak)
+        dy_dir = np.where(np.abs(dy) > 1e-6, np.sign(dy), idx_tiebreak)
+
         # Push each label by half the overlap in the direction it already leans
-        push_x = np.where(mask, ov_x * np.sign(dx + 1e-9), 0.0)
-        push_y = np.where(mask, ov_y * np.sign(dy + 1e-9), 0.0)
+        push_x = np.where(mask, ov_x * dx_dir, 0.0)
+        push_y = np.where(mask, ov_y * dy_dir, 0.0)
 
         pos[:, 0] += _REPEL_STEP * push_x.sum(axis=1)
         pos[:, 1] += _REPEL_STEP * push_y.sum(axis=1)
@@ -519,6 +484,19 @@ def draw_landscape_panel(ax, year: int, word_coords: dict[str, np.ndarray],
                           else 7) for w in render}
         render = repel_labels(render, font_sizes, ax)
 
+        # Repulsion can push labels outside the pre-repulsion limits above.
+        # ax.annotate()'s default annotation_clip silently drops any label
+        # whose anchor falls outside the current xlim/ylim, so the view must
+        # be re-fit to the post-repulsion positions or those labels vanish.
+        xs = [p[0] for p in render.values()]
+        ys = [p[1] for p in render.values()]
+        x_range = max(xs) - min(xs) or 1.0
+        y_range = max(ys) - min(ys) or 1.0
+        xpad = x_range * 0.12 + 0.05
+        ypad = y_range * 0.12 + 0.05
+        ax.set_xlim(min(xs) - xpad, max(xs) + xpad)
+        ax.set_ylim(min(ys) - ypad, max(ys) + ypad)
+
     # Draw labels at final positions
     for word, (x, y) in render.items():
         is_kw = word in highlight_set
@@ -529,7 +507,8 @@ def draw_landscape_panel(ax, year: int, word_coords: dict[str, np.ndarray],
                     fontsize=10 if (is_kw or is_gw) else 7,
                     color=color,
                     ha="center", va="center",
-                    alpha=1.0 if (is_kw or is_gw) else 0.6)
+                    alpha=1.0 if (is_kw or is_gw) else 0.6,
+                    annotation_clip=False)
 
     ax.set_title(f"Semantic Landscape — {year}", fontsize=12)
     ax.set_xticks([]); ax.set_yticks([])
@@ -563,6 +542,15 @@ def draw_static_panel(ax, title: str, word_coords: dict[str, np.ndarray],
                           else 7) for w in render}
         render = repel_labels(render, font_sizes, ax)
 
+        # Re-fit the view to the post-repulsion positions — see the matching
+        # comment in draw_landscape_panel for why this is required, not optional.
+        xs = [p[0] for p in render.values()]
+        ys = [p[1] for p in render.values()]
+        x_range = max(xs) - min(xs) or 1.0
+        y_range = max(ys) - min(ys) or 1.0
+        ax.set_xlim(min(xs) - x_range * 0.12 - 0.05, max(xs) + x_range * 0.12 + 0.05)
+        ax.set_ylim(min(ys) - y_range * 0.12 - 0.05, max(ys) + y_range * 0.12 + 0.05)
+
     for word, (x, y) in render.items():
         is_kw = word in highlight_set
         is_gw = second_highlight_set is not None and word in second_highlight_set
@@ -572,7 +560,8 @@ def draw_static_panel(ax, title: str, word_coords: dict[str, np.ndarray],
                     fontsize=10 if (is_kw or is_gw) else 7,
                     color=color,
                     ha="center", va="center",
-                    alpha=1.0 if (is_kw or is_gw) else 0.6)
+                    alpha=1.0 if (is_kw or is_gw) else 0.6,
+                    annotation_clip=False)
 
     ax.set_title(title, fontsize=12)
     ax.set_xticks([]); ax.set_yticks([])
@@ -603,152 +592,199 @@ def save_landscape_gif(gif_path: pathlib.Path,
     plt.close()
     print(f"  GIF → {gif_path.name}")
 
-# ── 11. keywords_nearest_neighbors/ landscapes ────────────────────────────────
+# ── 12. nearest-neighbors/ landscapes ─────────────────────────────────────────
 # Consistent across years: NNs limited to top-500, no per-year freq filter
-print(f"\nSaving keywords_nearest_neighbors panels …")
-
 def _nn_coords(yr: int) -> dict[str, np.ndarray]:
     return {w: v for w, v in yr_coords[yr].items() if w in kw_nn_vocab}
 
-for yr in years:
-    coords = _nn_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw_aliases_set, apply_freq_filter=False)
-    p = LANDSCAPE_NN_KW_DIR / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
+if OUTPUTS["nearest_neighbors_landscape"]:
+    print("\nSaving nearest-neighbors panels …")
+    for yr in years:
+        coords = _nn_coords(yr)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        fig.patch.set_facecolor("white")
+        draw_landscape_panel(ax, yr, coords, kw_aliases_set, apply_freq_filter=False)
+        p = LANDSCAPE_NN_KW_DIR / f"landscape_{yr}.png"
+        plt.savefig(str(p), dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"  → {p.name}")
 
-save_landscape_gif(LANDSCAPE_NN_KW_DIR / "animation.gif",
-                   _nn_coords, kw_aliases_set, apply_freq_filter=False)
+    save_landscape_gif(LANDSCAPE_NN_KW_DIR / "animation.gif",
+                       _nn_coords, kw_aliases_set, apply_freq_filter=False)
 
-# ── 12. keywords/ landscapes — keywords (red) + go-words (orange) ─────────────
-print("\nSaving keywords panels (keywords in red + go-words in orange) …")
-
+# ── 13. go-words/ landscapes — keywords (red) + go-words (grey) ──────────────
 _kw_gw_vocab = kw_aliases_set | gw_canonical_set
 
 def _kw_coords(yr: int) -> dict[str, np.ndarray]:
     return {w: v for w, v in yr_coords[yr].items() if w in _kw_gw_vocab}
 
-for yr in years:
-    coords = _kw_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw_aliases_set,
-                         apply_freq_filter=False, highlight_color=TARGET_COLOR,
-                         second_highlight_set=gw_canonical_set,
-                         second_highlight_color=GO_WORDS_COLOR)
-    p = LANDSCAPE_KW_DIR / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
+if OUTPUTS["go_words_landscape"]:
+    print("\nSaving go-words panels (keywords in red + go-words in grey) …")
+    import os
+    if os.environ.get("DEBUG_DROPOUT"):
+        watch = ["indigenous", "vernacular", "representation", "technology", "global"]
+        for w in watch:
+            print(f"  [DEBUG] {w!r} in kw_aliases_set={w in kw_aliases_set} "
+                  f"in _kw_gw_vocab={w in _kw_gw_vocab} "
+                  f"in yr_coords[2023]={w in yr_coords[2023]} "
+                  f"in _kw_coords(2023)={w in _kw_coords(2023)}")
+            if w in _kw_coords(2023):
+                print(f"    coord = {_kw_coords(2023)[w]}")
+    for yr in years:
+        coords = _kw_coords(yr)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        fig.patch.set_facecolor("white")
+        draw_landscape_panel(ax, yr, coords, kw_aliases_set,
+                             apply_freq_filter=False, highlight_color=TARGET_COLOR,
+                             second_highlight_set=gw_canonical_set,
+                             second_highlight_color=GO_WORDS_COLOR)
+        p = LANDSCAPE_KW_DIR / f"landscape_{yr}.png"
+        plt.savefig(str(p), dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"  → {p.name}")
 
-save_landscape_gif(LANDSCAPE_KW_DIR / "animation.gif",
-                   _kw_coords, kw_aliases_set,
-                   apply_freq_filter=False, highlight_color=TARGET_COLOR,
-                   second_highlight_set=gw_canonical_set,
-                   second_highlight_color=GO_WORDS_COLOR)
+    save_landscape_gif(LANDSCAPE_KW_DIR / "animation.gif",
+                       _kw_coords, kw_aliases_set,
+                       apply_freq_filter=False, highlight_color=TARGET_COLOR,
+                       second_highlight_set=gw_canonical_set,
+                       second_highlight_color=GO_WORDS_COLOR)
 
-# ── 13. keywords_top100/ landscapes ──────────────────────────────────────────
-print(f"\nSaving keywords_top100 panels (MIN_FREQ={MIN_FREQ}) …")
-
+# ── 14. top-100/ landscapes ───────────────────────────────────────────────────
 def _top100_coords(yr: int) -> dict[str, np.ndarray]:
     return {w: v for w, v in yr_coords[yr].items() if w in top_words_set}
 
-for yr in years:
-    coords = _top100_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw_aliases_set)
-    p = LANDSCAPE_TOP100_DIR / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
+if OUTPUTS["top100_landscape"]:
+    print(f"\nSaving top-100 panels (MIN_FREQ={MIN_FREQ}) …")
+    for yr in years:
+        coords = _top100_coords(yr)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        fig.patch.set_facecolor("white")
+        draw_landscape_panel(ax, yr, coords, kw_aliases_set)
+        p = LANDSCAPE_TOP100_DIR / f"landscape_{yr}.png"
+        plt.savefig(str(p), dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"  → {p.name}")
 
-save_landscape_gif(LANDSCAPE_TOP100_DIR / "animation.gif",
-                   _top100_coords, kw_aliases_set)
+    save_landscape_gif(LANDSCAPE_TOP100_DIR / "animation.gif",
+                       _top100_coords, kw_aliases_set)
 
-# ── 14. keywords_top200/ landscapes ──────────────────────────────────────────
-print(f"\nSaving keywords_top200 panels (MIN_FREQ={MIN_FREQ}) …")
-
+# ── 15. top-200/ landscapes ───────────────────────────────────────────────────
 def _top200_coords(yr: int) -> dict[str, np.ndarray]:
     return {w: v for w, v in yr_coords[yr].items() if w in top_200_set}
 
-for yr in years:
-    coords = _top200_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw_aliases_set)
-    p = LANDSCAPE_TOP200_DIR / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
+if OUTPUTS["top200_landscape"]:
+    print(f"\nSaving top-200 panels (MIN_FREQ={MIN_FREQ}) …")
+    for yr in years:
+        coords = _top200_coords(yr)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        fig.patch.set_facecolor("white")
+        draw_landscape_panel(ax, yr, coords, kw_aliases_set)
+        p = LANDSCAPE_TOP200_DIR / f"landscape_{yr}.png"
+        plt.savefig(str(p), dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"  → {p.name}")
 
-save_landscape_gif(LANDSCAPE_TOP200_DIR / "animation.gif",
-                   _top200_coords, kw_aliases_set)
+    save_landscape_gif(LANDSCAPE_TOP200_DIR / "animation.gif",
+                       _top200_coords, kw_aliases_set)
 
-# ── 16. keywords_top500/ landscapes ──────────────────────────────────────────
-print(f"\nSaving keywords_top500 panels (MIN_FREQ={MIN_FREQ}) …")
-
+# ── 16. top-500/ landscapes ───────────────────────────────────────────────────
 def _top500_coords(yr: int) -> dict[str, np.ndarray]:
     return {w: v for w, v in yr_coords[yr].items() if w in top_500_set}
 
-for yr in years:
-    coords = _top500_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw_aliases_set)
-    p = LANDSCAPE_TOP500_DIR / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
+if OUTPUTS["top500_landscape"]:
+    print(f"\nSaving top-500 panels (MIN_FREQ={MIN_FREQ}) …")
+    for yr in years:
+        coords = _top500_coords(yr)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        fig.patch.set_facecolor("white")
+        draw_landscape_panel(ax, yr, coords, kw_aliases_set)
+        p = LANDSCAPE_TOP500_DIR / f"landscape_{yr}.png"
+        plt.savefig(str(p), dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"  → {p.name}")
 
-save_landscape_gif(LANDSCAPE_TOP500_DIR / "animation.gif",
-                   _top500_coords, kw_aliases_set)
+    save_landscape_gif(LANDSCAPE_TOP500_DIR / "animation.gif",
+                       _top500_coords, kw_aliases_set)
 
 # ── 17. UMAP landscape (corpus average vectors — single aggregate view) ────────
-print("\nBuilding UMAP embedding (average vectors across all years) …")
-reducer = umap_lib.UMAP(
-    n_components=2, n_neighbors=15, min_dist=0.1,
-    metric="cosine", random_state=42,
-)
-umap_arr  = reducer.fit_transform(mat)   # mat = avg-vec matrix built for PCA
-umap_coords: dict[str, np.ndarray] = {
-    w: umap_arr[i] for i, w in enumerate(valid_vocab)
-}
-print(f"  UMAP fitted on {len(valid_vocab)} words")
+if OUTPUTS["umap_aggregate"]:
+    print("\nBuilding UMAP embedding (average vectors across all years) …")
+    reducer = umap_lib.UMAP(
+        n_components=2, n_neighbors=15, min_dist=0.1,
+        metric="cosine", random_state=42,
+    )
+    umap_arr  = reducer.fit_transform(mat)   # mat = avg-vec matrix built for PCA
+    umap_coords: dict[str, np.ndarray] = {
+        w: umap_arr[i] for i, w in enumerate(valid_vocab)
+    }
+    print(f"  UMAP fitted on {len(valid_vocab)} words")
 
-_umap_landscapes = [
-    ("nearest-neighbors", kw_nn_vocab,   kw_aliases_set, TARGET_COLOR,    None),
-    ("go-words",          _kw_gw_vocab,  kw_aliases_set, TARGET_COLOR,    gw_canonical_set),
-    ("top-100",           top_words_set, kw_aliases_set, TARGET_COLOR,    None),
-    ("top-200",           top_200_set,   kw_aliases_set, TARGET_COLOR,    None),
-    ("top-500",           top_500_set,   kw_aliases_set, TARGET_COLOR,    None),
-]
+    _umap_landscapes = [
+        ("nearest-neighbors", kw_nn_vocab,   kw_aliases_set, TARGET_COLOR, None),
+        ("go-words",          _kw_gw_vocab,  kw_aliases_set, TARGET_COLOR, gw_canonical_set),
+        ("top-100",           top_words_set, kw_aliases_set, TARGET_COLOR, None),
+        ("top-200",           top_200_set,   kw_aliases_set, TARGET_COLOR, None),
+        ("top-500",           top_500_set,   kw_aliases_set, TARGET_COLOR, None),
+    ]
 
-for name, word_set, highlight_set, h_color, second_set in _umap_landscapes:
-    coords = {w: umap_coords[w] for w in word_set if w in umap_coords}
+    for name, word_set, highlight_set, h_color, second_set in _umap_landscapes:
+        coords = {w: umap_coords[w] for w in word_set if w in umap_coords}
+        fig, ax = plt.subplots(figsize=(10, 8))
+        fig.patch.set_facecolor("white")
+        draw_static_panel(ax, f"UMAP Semantic Landscape (keywords-{KEYWORD_SET}) — "
+                          f"{name.replace('-', ' ')}",
+                          coords, highlight_set, h_color,
+                          second_highlight_set=second_set)
+        p = UMAP_DIR / f"{name}.png"
+        plt.savefig(str(p), dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"  → {p.name}")
+
+# ── 18. Semantic trajectories ──────────────────────────────────────────────────
+if OUTPUTS["term_trajectories"]:
+    print("\nDrawing term trajectories …")
     fig, ax = plt.subplots(figsize=(10, 8))
     fig.patch.set_facecolor("white")
-    draw_static_panel(ax, f"UMAP Semantic Landscape — {name.replace('-', ' ')}",
-                      coords, highlight_set, h_color,
-                      second_highlight_set=second_set)
-    p = UMAP_DIR / f"{name}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
+    cmap = plt.get_cmap("tab20" if len(TARGET_TERMS) > 10 else "tab10")
+
+    for i, term in enumerate(TARGET_TERMS):
+        pts = [yr_coords[yr][term] for yr in years if term in yr_coords[yr]]
+        if len(pts) < 2:
+            continue
+        pts   = np.array(pts)
+        color = cmap(i / max(len(TARGET_TERMS) - 1, 1))
+        ax.plot(pts[:, 0], pts[:, 1], color=color, linewidth=1.2,
+                alpha=0.85, marker="o", markersize=3, zorder=2)
+        ax.annotate("", xy=pts[-1], xytext=pts[-2],
+                    arrowprops=dict(arrowstyle="-|>", color=color, lw=1.4),
+                    zorder=3)
+        ax.annotate(term, pts[-1], fontsize=9, color=color,
+                    ha="left", va="bottom", xytext=(3, 3),
+                    textcoords="offset points", zorder=4)
+
+    ax.set_title(f"Semantic Trajectories — Keywords-{KEYWORD_SET} "
+                f"({first_yr} -> {last_yr})", fontsize=13)
+    ax.set_xticks([]); ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_facecolor("white")
+    fig.tight_layout()
+    p = KW_DIR / "term_trajectories.png"
+    fig.savefig(str(p), dpi=150, bbox_inches="tight")
+    plt.close(fig)
     print(f"  → {p.name}")
 
 # ── 19. Topographic concentric diagrams — 2-row layout, fading darkness ───────
-print("\nGenerating topographic ring diagrams …")
-
 # Ring configuration
-_FEATURE_RADII  = [0.28, 0.55, 0.82]
+_FEATURE_RADII  = [0.32, 0.60, 0.86]
 _RING_GROUPS    = [slice(0, 4), slice(4, 8), slice(8, 12)]
 # Inner ring: X shape (π/4) so words are diagonal, not directly L/R of center
 _RING_OFFSETS   = [np.pi / 4, 0.0, np.pi / 8]
-# Contour step 0.09 puts circles exactly on feature radii (0.28, 0.55, 0.82)
-_CONTOUR_RADII  = np.arange(0.10, 0.93, 0.09)
+# Small alternating radial jitter within a ring keeps adjacent long words from
+# merging into one another when they sit close together in angle.
+_RING_JITTER    = 0.045
+# Contour circles span slightly past the outer feature ring
+_CONTOUR_RADII  = np.arange(0.12, 0.95, 0.09)
 _C_MIN, _C_MAX  = _CONTOUR_RADII[0], _CONTOUR_RADII[-1]
 
 # Per-ring text colours (inner = darkest, outer = lightest)
@@ -762,9 +798,9 @@ def draw_ring_diagram(term: str, year_nn: dict, years_to_plot: list,
     n_rows   = 2 if n_panels > 1 else 1
 
     fig, axes = plt.subplots(n_rows, n_cols,
-                              figsize=(3.2 * n_cols, 4.6 * n_rows),
+                              figsize=(3.7 * n_cols, 3.9 * n_rows),
                               subplot_kw={"projection": "polar"},
-                              gridspec_kw={"hspace": 0.08, "wspace": 0.05})
+                              gridspec_kw={"hspace": 0.30, "wspace": 0.05})
     axes_flat = list(axes.flat) if hasattr(axes, "flat") else [axes]
 
     for ax, yr in zip(axes_flat, years_to_plot):
@@ -786,7 +822,9 @@ def draw_ring_diagram(term: str, year_nn: dict, years_to_plot: list,
             ax.plot(theta_full, [r] * 300,
                     color=color, linewidth=lw, alpha=alpha, zorder=0)
 
-        # Place words at feature ring positions with faded text by ring
+        # Place words at feature ring positions with faded text by ring.
+        # Adjacent words in the same ring alternate a small radial jitter so
+        # long words don't run into one another at a fixed radius.
         for ring_idx, (ring_r, grp, offset) in enumerate(
                 zip(_FEATURE_RADII, _RING_GROUPS, _RING_OFFSETS)):
             words_in_ring = nns[grp]
@@ -794,7 +832,8 @@ def draw_ring_diagram(term: str, year_nn: dict, years_to_plot: list,
             text_color = _RING_TEXT_COLORS[ring_idx]
             for i, (word, _) in enumerate(words_in_ring):
                 theta = (2 * np.pi * i / max(n, 1)) + offset
-                ax.text(theta, ring_r, word,
+                r     = ring_r + (_RING_JITTER if i % 2 else -_RING_JITTER)
+                ax.text(theta, r, word,
                         ha="center", va="center",
                         fontsize=8, color=text_color)
 
@@ -811,161 +850,26 @@ def draw_ring_diagram(term: str, year_nn: dict, years_to_plot: list,
     for ax in axes_flat[n_panels:]:
         ax.set_visible(False)
 
-    fig.suptitle(f'"{term}" — nearest neighbours across years', fontsize=12, y=1.01)
-    plt.tight_layout()
+    fig.suptitle(f'"{term}" — nearest neighbours across years', fontsize=12, y=0.985)
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.88, bottom=0.03)
     plt.savefig(str(outpath), dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  → {outpath.name}")
 
 
-for term in TARGET_TERMS:
-    draw_ring_diagram(term, nn_results[term], years,
-                      CONC_DIAG_DIR / f"concentric_{term}.png")
+if OUTPUTS["concentric_diagrams"]:
+    print("\nGenerating topographic ring diagrams (neighbours drawn from go-words) …")
+    for term in TARGET_TERMS:
+        draw_ring_diagram(term, nn_results_conc[term], years,
+                          CONC_DIAG_DIR / f"concentric_{term}.png")
 
-print("\n✓ Analysis complete. Outputs →", OUT_DIR)
-print("  keywords/")
-print("    nearest_neighbours.csv, semantic_shift_bar.png")
+print(f"\n✓ Analysis complete. Outputs → {KW_DIR}")
+print(f"  keywords-{KEYWORD_SET}/")
+print("    nearest_neighbours.csv, semantic_shift_bar.png, term_trajectories.png")
 print(f"    nearest-neighbors/   ({len(years)} PNGs + animation.gif)")
 print(f"    go-words/            ({len(years)} PNGs + animation.gif)  [keywords=red, go-words=grey]")
 print(f"    top-100/             ({len(years)} PNGs + animation.gif)")
 print(f"    top-200/             ({len(years)} PNGs + animation.gif)")
 print(f"    top-500/             ({len(years)} PNGs + animation.gif)")
 print(f"    concentric-diagrams/ ({len(TARGET_TERMS)} PNGs)")
-print("    umap/                (5 PNGs — aggregate corpus view)")
-
-# ══════════════════════════════════════════════════════════════════════════════
-# KEYWORDS-2 ANALYSIS
-# ══════════════════════════════════════════════════════════════════════════════
-
-# ── keywords-2 nearest_neighbors/ landscapes ─────────────────────────────────
-print(f"\nSaving keywords-2 keywords_nearest_neighbors panels …")
-
-def _nn2_coords(yr: int) -> dict[str, np.ndarray]:
-    return {w: v for w, v in yr_coords[yr].items() if w in kw2_nn_vocab}
-
-for yr in years:
-    coords = _nn2_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw2_aliases_set, apply_freq_filter=False)
-    p = LANDSCAPE_NN_KW_DIR_2 / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
-
-save_landscape_gif(LANDSCAPE_NN_KW_DIR_2 / "animation.gif",
-                   _nn2_coords, kw2_aliases_set, apply_freq_filter=False)
-
-# ── keywords-2 keywords/ landscapes — keywords-2 (red) + go-words (orange) ────
-print("\nSaving keywords-2 keywords panels (keywords-2 in red + go-words in orange) …")
-
-_kw2_gw_vocab = kw2_aliases_set | gw_canonical_set
-
-def _kw2_coords(yr: int) -> dict[str, np.ndarray]:
-    return {w: v for w, v in yr_coords[yr].items() if w in _kw2_gw_vocab}
-
-for yr in years:
-    coords = _kw2_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw2_aliases_set,
-                         apply_freq_filter=False, highlight_color=TARGET_COLOR,
-                         second_highlight_set=gw_canonical_set,
-                         second_highlight_color=GO_WORDS_COLOR)
-    p = LANDSCAPE_KW_DIR_2 / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
-
-save_landscape_gif(LANDSCAPE_KW_DIR_2 / "animation.gif",
-                   _kw2_coords, kw2_aliases_set,
-                   apply_freq_filter=False, highlight_color=TARGET_COLOR,
-                   second_highlight_set=gw_canonical_set,
-                   second_highlight_color=GO_WORDS_COLOR)
-
-# ── keywords-2 keywords_top100/ landscapes ────────────────────────────────────
-print(f"\nSaving keywords-2 keywords_top100 panels (MIN_FREQ={MIN_FREQ}) …")
-
-for yr in years:
-    coords = _top100_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw2_aliases_set)
-    p = LANDSCAPE_TOP100_DIR_2 / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
-
-save_landscape_gif(LANDSCAPE_TOP100_DIR_2 / "animation.gif",
-                   _top100_coords, kw2_aliases_set)
-
-# ── keywords-2 keywords_top200/ landscapes ────────────────────────────────────
-print(f"\nSaving keywords-2 keywords_top200 panels (MIN_FREQ={MIN_FREQ}) …")
-
-for yr in years:
-    coords = _top200_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw2_aliases_set)
-    p = LANDSCAPE_TOP200_DIR_2 / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
-
-save_landscape_gif(LANDSCAPE_TOP200_DIR_2 / "animation.gif",
-                   _top200_coords, kw2_aliases_set)
-
-# ── keywords-2 keywords_top500/ landscapes ────────────────────────────────────
-print(f"\nSaving keywords-2 keywords_top500 panels (MIN_FREQ={MIN_FREQ}) …")
-
-for yr in years:
-    coords = _top500_coords(yr)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.patch.set_facecolor("white")
-    draw_landscape_panel(ax, yr, coords, kw2_aliases_set)
-    p = LANDSCAPE_TOP500_DIR_2 / f"landscape_{yr}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
-
-save_landscape_gif(LANDSCAPE_TOP500_DIR_2 / "animation.gif",
-                   _top500_coords, kw2_aliases_set)
-
-# ── keywords-2 UMAP landscapes ───────────────────────────────────────────────
-_umap_landscapes_2 = [
-    ("nearest-neighbors", kw2_nn_vocab,    kw2_aliases_set, TARGET_COLOR, None),
-    ("go-words",          _kw2_gw_vocab,   kw2_aliases_set, TARGET_COLOR, gw_canonical_set),
-    ("top-100",           top_words_set,   kw2_aliases_set, TARGET_COLOR, None),
-    ("top-200",           top_200_set,     kw2_aliases_set, TARGET_COLOR, None),
-    ("top-500",           top_500_set,     kw2_aliases_set, TARGET_COLOR, None),
-]
-
-for name, word_set, highlight_set, h_color, second_set in _umap_landscapes_2:
-    coords = {w: umap_coords[w] for w in word_set if w in umap_coords}
-    fig, ax = plt.subplots(figsize=(10, 8))
-    fig.patch.set_facecolor("white")
-    draw_static_panel(ax, f"UMAP Semantic Landscape (keywords-2) — {name.replace('-', ' ')}",
-                      coords, highlight_set, h_color,
-                      second_highlight_set=second_set)
-    p = UMAP_DIR_2 / f"{name}.png"
-    plt.savefig(str(p), dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  → {p.name}")
-
-# ── keywords-2 topographic ring diagrams ──────────────────────────────────────
-print("\nGenerating keywords-2 topographic ring diagrams …")
-
-for term in TARGET_TERMS_2:
-    draw_ring_diagram(term, nn_results_2[term], years,
-                      CONC_DIAG_DIR_2 / f"concentric_{term}.png")
-
-print("\n✓ Keywords-2 analysis complete. Outputs →", OUT_DIR_2)
-print("  keywords-2/")
-print("    nearest_neighbours.csv, semantic_shift_bar.png")
-print(f"    nearest-neighbors/   ({len(years)} PNGs + animation.gif)")
-print(f"    go-words/            ({len(years)} PNGs + animation.gif)")
-print(f"    top-100/             ({len(years)} PNGs + animation.gif)")
-print(f"    top-200/             ({len(years)} PNGs + animation.gif)")
-print(f"    top-500/             ({len(years)} PNGs + animation.gif)")
-print(f"    concentric-diagrams/ ({len(TARGET_TERMS_2)} PNGs)")
 print("    umap/                (5 PNGs — aggregate corpus view)")
