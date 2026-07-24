@@ -1,0 +1,14 @@
+# Administrative / generic verb stopwords for verb analysis
+# One verb lemma per line; lines starting with # are ignored.
+# Placeholder starter list — expand after reviewing verbs_corpus.csv.
+
+be
+have
+do
+go
+get
+make
+take
+use
+give
+come

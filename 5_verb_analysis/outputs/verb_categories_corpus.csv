@@ -1,0 +1,10 @@
+category,distinct_lemmas_observed,corpus_count,slope_freq_per_1000_per_yr,top_members,2020,2021,2022,2023,2024,2025,2026
+misc,2660,43742,1.4202,"include, develop, work, base, focus, address, explore, provide, propose, support",8600,7813,4218,4923,5678,4336,8174
+doing,59,5094,0.1527,"build, design, create, write, produce, draw, represent, generate, construct, implement",991,893,539,547,651,438,1035
+knowledge,74,4877,0.1134,"teach, understand, learn, examine, study, investigate, think, recognize, demonstrate, analyze",998,859,509,528,537,448,998
+positioning,43,2683,0.3483,"relate, connect, align, center, ground, situate, embed, link, position, frame",491,416,202,274,316,246,738
+collaborating,8,1639,0.2233,"engage, contribute, share, participate, collaborate, join, coordinate, partner",252,246,169,188,212,202,370
+questioning,45,1092,-0.0067,"challenge, reimagine, rethink, question, speculate, pose, redefine, interrogate, reframe, argue",249,173,129,115,128,113,185
+environment_negative,52,627,-0.0003,"marginalize, exacerbate, extract, threaten, displace, ignore, overlook, dominate, destroy, damage",123,106,76,82,78,63,99
+environment_positive,36,623,0.0256,"mitigate, empower, sustain, advocate, protect, preserve, thrive, restore, mobilize, decarbonize",108,96,94,58,91,68,108
+built_environment,43,464,0.0053,"occupy, inhabit, site, rebuild, house, zone, isolate, enclose, reclaim, renew",81,89,55,53,63,40,83
