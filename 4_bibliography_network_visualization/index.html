@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Syllabus Citation Network</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage">
+        <canvas id="edge-canvas"></canvas>
+        <svg id="node-layer"></svg>
+        <div id="loading">computing layout&hellip;</div>
+      </div>
+
+      <header id="topbar">
+        <div class="topbar-buttons">
+          <button
+            id="info-btn"
+            aria-expanded="false"
+            title="About this visualization"
+          >
+            i
+          </button>
+          <button id="sidebar-btn" aria-expanded="true" title="View options">
+            &#9881;
+          </button>
+        </div>
+      </header>
+
+      <aside id="sidebar">
+        <h1>Syllabus Citation Network</h1>
+        <h2>View options</h2>
+
+        <div class="control">
+          <label for="edge-weight"
+            >Min. co-citations per link
+            <span id="edge-weight-val">2</span></label
+          >
+          <input
+            type="range"
+            id="edge-weight"
+            min="1"
+            max="5"
+            step="1"
+            value="2"
+          />
+        </div>
+
+        <div class="control">
+          <label for="min-cites"
+            >Min. syllabi per text <span id="min-cites-val">2</span></label
+          >
+          <input
+            type="range"
+            id="min-cites"
+            min="2"
+            max="8"
+            step="1"
+            value="2"
+          />
+        </div>
+
+        <div class="control">
+          <label for="spacing">Spacing <span id="spacing-val">1.0</span></label>
+          <input
+            type="range"
+            id="spacing"
+            min="0.6"
+            max="2.4"
+            step="0.2"
+            value="1"
+          />
+        </div>
+
+        <div class="control">
+          <span class="control-title">Texts shown as</span>
+          <div class="radio-row" id="node-style">
+            <label
+              ><input type="radio" name="node-style" value="covers" checked />
+              covers</label
+            >
+            <label
+              ><input type="radio" name="node-style" value="text" /> text</label
+            >
+            <label
+              ><input type="radio" name="node-style" value="dots" /> dots</label
+            >
+          </div>
+        </div>
+
+        <div class="control">
+          <span class="control-title">Color by</span>
+          <div class="radio-row" id="color-mode">
+            <label
+              ><input type="radio" name="color-mode" value="cluster" checked />
+              cluster</label
+            >
+            <label
+              ><input type="radio" name="color-mode" value="year" /> year</label
+            >
+            <label
+              ><input type="radio" name="color-mode" value="type" /> type</label
+            >
+          </div>
+        </div>
+
+        <!-- <div class="control">
+          <span class="control-title">Cluster algorithm</span>
+          <div class="radio-row" id="cluster-algo">
+            <label
+              ><input type="radio" name="cluster-algo" value="organic" checked />
+              organic</label
+            >
+            <label
+              ><input type="radio" name="cluster-algo" value="balanced" />
+              balanced</label
+            >
+          </div>
+        </div> -->
+
+        <div class="control">
+          <span class="control-title">Theme</span>
+          <div class="radio-row" id="theme-mode">
+            <label
+              ><input type="radio" name="theme-mode" value="dark" checked />
+              dark</label
+            >
+            <label
+              ><input type="radio" name="theme-mode" value="light" />
+              light</label
+            >
+          </div>
+        </div>
+
+        <div id="legend"></div>
+        <div id="stats" class="muted"></div>
+      </aside>
+
+      <div id="info-panel" hidden>
+        <button id="info-close" title="Close">&times;</button>
+        <h2>About</h2>
+        <p>
+          Each node is a text cited in the bibliographies of architecture-school
+          syllabi collected for the Buell Center's green-counting project
+          (2020&ndash;2026). Only texts cited in at least two syllabi appear.
+          Node size reflects how many syllabi cite the text.
+        </p>
+        <p>
+          Two texts are linked when the same syllabus cites both; heavier,
+          darker lines mean they co-occur in more syllabi. The layout is
+          force-directed, so frequently co-cited texts pull together into
+          neighborhoods, and colors mark communities detected from the citation
+          links.
+        </p>
+        <p>
+          Covers are fetched from the Open Library API where a match exists;
+          texts without covers (most articles and reports) are drawn as
+          title&ndash;author labels. Hover any node or line for details.
+        </p>
+        <p>
+          Two clustering algorithms are available.
+          <strong>Organic</strong> (weighted label propagation) follows how
+          texts are actually co-cited, so a few foundational texts pull huge
+          natural neighborhoods together while the rest fragment into many small
+          groups &mdash; anything too small to earn its own color lands in
+          "Other." <strong>Balanced</strong> (recursive spectral bisection)
+          instead repeatedly splits the network along its weakest connections to
+          force even, similarly sized groups with no leftover bucket &mdash; at
+          the cost of occasionally cutting through a genuinely tight-knit
+          reading group just to hit the size target.
+        </p>
+      </div>
+
+      <div id="tooltip" hidden></div>
+    </div>
+
+    <script src="d3.v7.min.js"></script>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
