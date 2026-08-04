@@ -8,15 +8,16 @@ what a syllabus is about, but what it asks students to *do* to that subject matt
 it, question it, position it, teach it — and whether that framing is changing between 2020
 and 2026.
 
-Three independent, self-contained scripts:
+Four independent, self-contained scripts:
 
 | Script | Answers |
 |---|---|
 | `verb_frequency_voice_category_analysis.py` | Which verbs are most common, corpus-wide and per year? What fraction of verb usage is active vs. passive voice? Which thematic category (from `verb_categories.txt`) does each verb belong to, and how is each category trending? |
 | `verb_noun_occurrence_analysis.py` | Which nouns does a given verb tend to appear alongside — e.g. does "analyze" really co-occur with "climate"? |
 | `verb_category_noun_trends_analysis.py` | For a whole category of verbs (not one verb at a time), how does its noun profile shift year by year — e.g. what does the "doing" category get done *to* in 2020 vs. 2026? |
+| `verb_category_keyword_category_analysis.py` | Does a syllabus's *topic* vocabulary (theoretical, quantitative, economic, … per `data/Categories.csv`) predict which *verb* vocabulary it leans on — e.g. does "theoretical" language really pair with "positioning" verbs more than "questioning" verbs? |
 
-All three tag the **raw, unfiltered** `full_text` column of `data/syllabi_text.csv` with
+All four tag the **raw, unfiltered** `full_text` column of `data/syllabi_text.csv` with
 spaCy (`en_core_web_sm`) — see §0 below for why that matters, and why no changes to step
 0's preprocessing were needed to make this possible.
 
@@ -26,6 +27,7 @@ spaCy (`en_core_web_sm`) — see §0 below for why that matters, and why no chan
 python3 verb_frequency_voice_category_analysis.py            # ~2–3 min, full corpus
 python3 verb_noun_occurrence_analysis.py                      # ~3–4 min, full corpus
 python3 verb_category_noun_trends_analysis.py                 # ~2–3 min, full corpus
+python3 verb_category_keyword_category_analysis.py            # ~1 min, full corpus
 ```
 
 Each accepts `--limit N` to tag only the first N syllabi, for a quick smoke-test before a
@@ -54,6 +56,10 @@ re-running the others.
 | `outputs/verb_noun_occurrence_analysis.md` | Generated report for the above, plus the embedding cross-check |
 | `outputs/verb_category_noun_trends.csv` | Per-year (category, noun) co-occurrence table |
 | `outputs/verb_category_noun_trends_analysis.md` | Generated report for the above, plus a turnover summary |
+| `outputs/verb_category_keyword_category.csv` | Full verb-category × keyword-category contingency table, scored with G² and PMI |
+| `outputs/verb_category_keyword_category_analysis.md` | Generated report for the above, plus PMI-ranked "what's distinctive to what" summaries in both directions |
+| `outputs/verb_keyword_pmi_heatmap.png` | Heatmap: distinctiveness (PMI, diverging red/blue centered on independence at 0) |
+| `outputs/verb_keyword_count_heatmap.png` | Heatmap: evidence weight (raw co-occurring sentence counts, sequential — reads alongside the PMI heatmap so a strong color in one isn't mistaken for a strong color in the other) |
 
 ## Methodology notes
 
@@ -139,6 +145,33 @@ a pooled 2020–2026 baseline. That's what makes "did this category's noun profi
 a meaningful year-over-year comparison rather than an artifact of some years having more
 syllabi (and therefore more sentences) than others.
 
+**§7 — Verb category ↔ keyword category.** `verb_category_keyword_category_analysis.py`
+crosses two taxonomies that had never been joined: this folder's 8 verb categories, and
+`data/Categories.csv`'s topic categories (theory, quantification, material, architecture,
+economic, land, solution, problem, representation, universal, local) — a keyword file that
+existed in the repo but wasn't wired into any script yet. Same sentence-level co-occurrence
+method as §6, except both sides are category-pooled (like §6's per-category extension), so
+the output is a small, fully-reportable 8×11 contingency table rather than thousands of
+individual pairs. `data/Categories.csv`'s own `verb` tag (a part-of-speech marker on some
+entries, e.g. *build*, *engage* — not a topic) is excluded from the keyword-category side.
+Two summary tables rank by **PMI, not raw co-occurrence %** — raw % mostly just reflects
+that `doing` and `knowledge` are the two most frequent verb categories corpus-wide (see the
+frequency table below), so ranking by raw share surfaces them almost everywhere and says
+little about any specific topic; PMI corrects for that base rate. The same PMI-vs-count
+distinction carries into the two heatmaps: `verb_keyword_pmi_heatmap.png` uses a **diverging**
+red/blue scale centered on 0 (independence) because PMI is a signed quantity — a magnitude
+ramp like the rest of this project's heatmaps would misrepresent it — while
+`verb_keyword_count_heatmap.png` keeps the project's usual sequential `YlOrRd` ramp, since raw
+counts are a true unsigned magnitude. Read them together: a dark PMI cell backed by a pale
+(low-count) cell in the companion chart is a thinner claim than the color alone suggests.
+
+**Coverage caveat.** `data/Categories.csv` has only 141 words / 186 surface forms (with
+aliases) — hand-picked for a smaller, earlier purpose, much sparser than the top-500-word
+noun vocabulary §6 draws on. Results held up at full-corpus scale (all 88 cells cleared the
+co-occurrence floor), but if this cross-tab proves useful, extending the file the way
+`verb_categories.txt` was extended (§5 — a handful of seed words per category, grown by LLM
+semantic judgment) would sharpen it further.
+
 ## Key findings (full corpus, 347 syllabi, 2020–2026)
 
 **Voice.** Of ~28,400 verb instances with an identifiable subject, **19.4% are passive**.
@@ -185,6 +218,22 @@ modeling, performance, system* (2026) — a tilt toward technical/computational 
 *material, crisis, landscape, geography, climate* (2026) — a tilt toward explicit crisis
 framing, even though the category's raw frequency didn't rise. Full year-by-year tables for
 every category are in `outputs/verb_category_noun_trends_analysis.md`.
+
+**Verb category vs. keyword-topic category** (`outputs/verb_category_keyword_category_analysis.md`;
+PMI = how far above chance the pairing is, correcting for how common each category already
+is on its own). Partial support for the "different topics pull different verbs" hypothesis,
+but not the exact shape originally guessed: `theory` vocabulary *is* distinctively tied to
+`positioning` verbs (PMI 0.78, its top pairing) — that half holds up. `quantification`
+vocabulary, though, is *not* distinctively tied to `questioning` verbs — its top two are
+`positioning` (0.69) and `doing` (0.68), and `questioning`'s PMI with `quantification` (0.47)
+is one of the lowest in `questioning`'s own row. `questioning` turns out to be most
+distinctive to a different pair entirely: `problem` (1.07) and `material` (0.89) vocabulary.
+More broadly, the two "environment" categories (`environment_positive`/`environment_negative`)
+are each most distinctive to `problem` and `economic` vocabulary (PMI 1.1–1.25, the highest
+scores in the whole table) — syllabus language about environmental harm or repair leans
+heavily on economic and problem-framing nouns specifically, more than any other verb
+category leans on any other topic. Full 8×11 table and both PMI-ranked summaries in the
+linked report.
 
 ## Worked examples: what does a verb co-occur with?
 
