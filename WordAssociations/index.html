@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Verbs × Keywords in Architecture Syllabi</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="viz-root">
+      <header>
+        <div class="page-col">
+          <h1>
+            How <span class="hl-verb">action words</span> pair with
+            <span class="hl-kw">topic words</span> in architecture syllabi
+          </h1>
+          <p class="subtitle">
+            This site reads 347 architecture course syllabi from 2020–2026,
+            sentence by sentence, and grouped their
+            <strong class="hl-verb">verbs</strong> (what the course asks students
+            to <em>do</em>) and their
+            <strong class="hl-kw">keywords</strong> (what the course talks
+            <em>about</em>) into categories. This chart shows which kinds of
+            <strong class="hl-verb">doing</strong> go with which kinds of
+            <strong class="hl-kw">topics</strong>. Hover over a cell to see the
+            courses that use that pairing most; click a cell to see how the
+            pairing has changed over time; click any course to see its full
+            profile.
+          </p>
+          <div class="nav-row">
+            <nav id="breadcrumb" aria-label="View navigation"></nav>
+            <label id="syllabus-picker-label">
+              Look at one course:
+              <select id="syllabus-picker">
+                <option value="">— choose —</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </header>
+
+      <!-- Metric toggle disabled for now; uncomment to re-enable (the JS still supports it).
+  <div id="controls" class="controls-row">
+    <div id="metric-toggle" class="toggle-group" role="group" aria-label="Corpus metric">
+      <button type="button" data-metric="pmi" class="active">Distinctiveness of Association</button>
+      <button type="button" data-metric="count">Number of Sentences</button>
+    </div>
+  </div>
+  -->
+
+      <main>
+        <section id="view-corpus" class="view"></section>
+        <section id="view-cell" class="view" hidden></section>
+        <section id="view-syllabus" class="view" hidden></section>
+      </main>
+
+      <div id="tooltip" role="tooltip" hidden></div>
+
+      <footer>
+        <div class="page-col">
+          <p>
+            How this was made: every syllabus was split into sentences. A sentence
+            counts toward a verb group when it uses one of that group's verbs, and
+            toward a keyword group when it mentions one of that group's topic
+            words (words are matched by their dictionary base form, and a word
+            only counts as a keyword when it isn't being used as a verb in that
+            sentence — so "building a wall" counts as a verb, while "the building"
+            counts as a keyword). "Distinctiveness of Association" compares how
+            often two groups actually share a sentence with how often they would
+            if the pairing were pure coincidence — a technical measure known as
+            Pointwise Mutual Information. The coincidence baseline is computed
+            only over sentences that contain at least one categorized word, so
+            administrative boilerplate (dates, grading policies, schedules)
+            doesn't distort it.
+          </p>
+        </div>
+      </footer>
+    </div>
+    <script src="data.js"></script>
+    <script src="drive_ids.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

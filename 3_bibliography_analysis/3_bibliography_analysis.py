@@ -578,6 +578,13 @@ def normalise_title(title: str) -> str:
     t = t.encode('ascii', 'ignore').decode()
     t = t.lower()
     t = re.sub(r'^(the|a|an)\s+', '', t)   # remove leading articles
+    # Strip generic "Chapter 3:" / "Part II:" style prefixes so the meaningful
+    # part of the title survives. Without this, the subtitle rule below reduces
+    # "Chapter 1: Introduction: Emergy and Real Wealth" to just "chapter 1",
+    # which fuzzy-matches every other "chapter N" citation in the corpus
+    # (SequenceMatcher("chapter 1", "chapter 5") = 0.89, above the 0.87
+    # threshold) and merges genuinely different chapters into one work.
+    t = re.sub(r'^(chapter|part|section|volume|vol|book|appendix)\s+[0-9ivxlc]+\s*[:.\-]\s*', '', t)
     # Only remove subtitle if the part before the colon is substantial (>=2 words)
     m = re.match(r'^(.+?)\s*:(.*)$', t)
     if m and len(m.group(1).split()) >= 2:
@@ -659,6 +666,14 @@ def author_match_key(name: str) -> str:
 # of the matching threshold/approach itself is a separate, deferred task.
 _EXACT_MATCH_ONLY_TITLES = {'design with nature now'}
 
+# Chapter titles so generic that identical wording says nothing about identity:
+# every book has an "Introduction". These get the first author's match key
+# appended to their dedup key so intros of different books never merge.
+_GENERIC_TITLES = {
+    'introduction', 'preface', 'foreword', 'conclusion', 'epilogue',
+    'prologue', 'afterword', 'overview', 'summary', 'interview',
+}
+
 
 def deduplicate(all_citations: list[dict]) -> list[dict]:
     """
@@ -702,6 +717,9 @@ def deduplicate(all_citations: list[dict]) -> list[dict]:
         norm = normalise_title(title)
         if not norm or len(norm) < 5:
             continue
+        if norm in _GENERIC_TITLES:
+            first_author = (cit.get('authors') or [''])[0] or ''
+            norm = f'{norm} {author_match_key(first_author)}'.strip()
 
         match_idx = _find_match(norm)
         pdf_key   = cit.get('source_pdf', '')
