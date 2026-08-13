@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Green Counting</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --surface: #fcfcfb;
+        --page: #f2f2ef;
+        --ink: #0b0b0b;
+        --muted: #898781;
+        --hairline: #dcdbd4;
+        --accent: #607872;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:where(:not([data-theme="light"])) {
+          --surface: #1a1a19;
+          --page: #0a0a0a;
+          --ink: #ffffff;
+          --muted: #898781;
+          --hairline: #343432;
+          --accent: #7fa89f;
+        }
+      }
+      :root[data-theme="dark"] {
+        --surface: #1a1a19;
+        --page: #0a0a0a;
+        --ink: #ffffff;
+        --muted: #898781;
+        --hairline: #343432;
+        --accent: #7fa89f;
+      }
+
+      * { box-sizing: border-box; }
+      html, body {
+        height: 100%;
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: var(--page);
+        color: var(--ink);
+      }
+      body { display: flex; flex-direction: column; }
+
+      /* ── Folder tabs ── */
+      .tabbar {
+        display: flex;
+        gap: 4px;
+        padding: 7px 12px 0;
+        background: #ffffff;
+        flex: 0 0 auto;
+      }
+      .tab {
+        appearance: none;
+        font: inherit;
+        font-size: 0.78rem;
+        color: #333333;
+        background: #ffffff;
+        border: 1px solid #000000;
+        border-radius: 6px 6px 0 0;
+        padding: 6px 14px;
+        cursor: pointer;
+        position: relative;
+        top: 1px;
+      }
+      .tab:hover { color: #000000; }
+      .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+      /* Word Associations reads as part of the page behind it, always. */
+      #tab-words { background: var(--page); }
+      #tab-words[aria-selected="true"] { border-bottom-color: var(--page); }
+
+      /* Bibliography Network opens onto its own dark page: only while
+         selected does its tab switch to that same dark grey; otherwise it
+         stays plain white like the other tab. */
+      #tab-biblio[aria-selected="true"] {
+        background: #1a1a19;
+        color: #ffffff;
+        border-color: #1a1a19;
+      }
+
+      .panes {
+        flex: 1 1 auto;
+        min-height: 0;
+        background: var(--surface);
+        border-top: 1px solid var(--hairline);
+      }
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: none;
+      }
+      iframe.active { display: block; }
+    </style>
+  </head>
+  <body>
+    <nav class="tabbar" role="tablist" aria-label="Site sections">
+      <button
+        class="tab"
+        role="tab"
+        id="tab-words"
+        data-target="frame-words"
+        aria-selected="true"
+        aria-controls="frame-words"
+      >Word Associations</button>
+      <button
+        class="tab"
+        role="tab"
+        id="tab-biblio"
+        data-target="frame-biblio"
+        aria-selected="false"
+        aria-controls="frame-biblio"
+      >Bibliography Network</button>
+    </nav>
+    <div class="panes">
+      <iframe
+        id="frame-words"
+        class="active"
+        role="tabpanel"
+        aria-labelledby="tab-words"
+        src="word_associations/index.html#pw=__PASSWORD__"
+        title="Verbs × Keywords in Architecture Syllabi"
+      ></iframe>
+      <iframe
+        id="frame-biblio"
+        role="tabpanel"
+        aria-labelledby="tab-biblio"
+        src="bibliography/index.html#pw=__PASSWORD__"
+        title="Syllabus Citation Network"
+      ></iframe>
+    </div>
+    <script>
+      (function () {
+        "use strict";
+        const tabs = document.querySelectorAll(".tab");
+        const frames = document.querySelectorAll("iframe");
+        tabs.forEach((tab) => {
+          tab.addEventListener("click", () => {
+            tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+            frames.forEach((f) => f.classList.toggle("active", f.id === tab.dataset.target));
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

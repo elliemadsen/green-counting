@@ -1,0 +1,230 @@
+/* Palette roles from the reference dataviz palette; light + dark selected
+   explicitly (media query for OS setting, data-theme override wins both ways). */
+.viz-root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --page: #f2f2ef;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --grid-hair: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border-ring: rgba(11, 11, 11, 0.10);
+  --div-mid: #f0efec;   /* diverging neutral midpoint */
+  --div-pos: #e34948;   /* red pole: co-occur more than chance */
+  --div-neg: #2a78d6;   /* blue pole: less than chance */
+  --accent: #2a78d6;
+  --hl-verb-bg: #ffdf9e;  /* yellow-orange highlighter for verb language */
+  --hl-kw-bg: #e2ef9c;    /* yellow-green highlighter for keyword language */
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0a0a0a;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid-hair: #2c2c2a;
+    --baseline: #383835;
+    --border-ring: rgba(255, 255, 255, 0.10);
+    --div-mid: #383835;
+    --div-pos: #e66767;
+    --div-neg: #3987e5;
+    --accent: #3987e5;
+    --hl-verb-bg: #6b5117;
+    --hl-kw-bg: #4c5a1a;
+  }
+}
+:root[data-theme="dark"] .viz-root {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --page: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --grid-hair: #2c2c2a;
+  --baseline: #383835;
+  --border-ring: rgba(255, 255, 255, 0.10);
+  --div-mid: #383835;
+  --div-pos: #e66767;
+  --div-neg: #3987e5;
+  --accent: #3987e5;
+  --hl-verb-bg: #6b5117;
+  --hl-kw-bg: #4c5a1a;
+}
+
+.hl-verb, .hl-kw { padding: 0 4px; border-radius: 4px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.hl-verb { background: var(--hl-verb-bg); }
+.hl-kw { background: var(--hl-kw-bg); }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: #f2f2ef; }
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) body { background: #0a0a0a; }
+}
+:root[data-theme="dark"] body { background: #0a0a0a; }
+
+.viz-root {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text-primary);
+  background: var(--page);
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+header h1 { font-size: 1.35rem; margin: 0 0 6px; }
+.subtitle { color: var(--text-secondary); font-size: 0.88rem; line-height: 1.45; margin: 0 0 10px; max-width: 72ch; }
+.subtitle code, footer code { font-size: 0.82em; background: var(--surface-1); border: 1px solid var(--border-ring); border-radius: 3px; padding: 0 3px; }
+
+.nav-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap; margin: 6px 0 10px;
+}
+#breadcrumb { font-size: 0.85rem; color: var(--text-muted); min-height: 1.4em; }
+#breadcrumb a { color: var(--accent); cursor: pointer; text-decoration: none; }
+#breadcrumb a:hover, #breadcrumb a:focus { text-decoration: underline; }
+#breadcrumb .sep { margin: 0 6px; color: var(--text-muted); }
+
+.controls-row {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  margin: 10px 0 16px;
+}
+.toggle-group {
+  display: inline-flex; border: 1px solid var(--baseline); border-radius: 6px; overflow: hidden;
+}
+.toggle-group button {
+  font: inherit; font-size: 0.82rem; color: var(--text-secondary);
+  background: var(--surface-1); border: none; padding: 6px 12px; cursor: pointer;
+}
+.toggle-group button + button { border-left: 1px solid var(--baseline); }
+.toggle-group button.active { background: var(--accent); color: #fff; }
+#syllabus-picker-label { font-size: 0.82rem; color: var(--text-secondary); }
+#syllabus-picker { font: inherit; font-size: 0.82rem; margin-left: 6px; max-width: 220px; }
+
+.view {
+  background: var(--surface-1); border: 1px solid var(--border-ring); border-radius: 8px;
+  padding: 18px; overflow-x: auto;
+  /* Every view hugs its own content width instead of stretching to the
+     page's max-width, and centers itself — the header/footer are then
+     synced to match this width in JS (see syncPageWidth in app.js), so
+     the whole page reads as one consistently-wide, centered column. */
+  width: fit-content; max-width: 100%; margin: 0 auto;
+}
+.view h2 { font-size: 1.02rem; margin: 0 0 4px; }
+.view .view-sub { color: var(--text-secondary); font-size: 0.84rem; margin: 0 0 14px; max-width: 78ch; }
+
+/* Header/footer inner wrapper: width is set in px by app.js's syncPageWidth()
+   to match the currently visible .view, then centered here. Falls back to
+   fit-content (its own natural width) before JS runs on first paint. */
+.page-col { width: fit-content; max-width: 100%; margin: 0 auto; }
+
+/* ── Axis labels around the heatmap ── */
+.axes-wrap { display: inline-block; }
+.axis-x {
+  text-align: center; font-size: 1.02rem; font-weight: 600;
+  color: var(--text-secondary); margin: 4px 0 10px 120px;
+}
+.axis-sub { font-weight: 400; font-size: 0.78rem; }
+.axes-row { display: flex; align-items: center; gap: 6px; }
+.axis-y {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  text-align: center; font-size: 1.02rem; font-weight: 600;
+  color: var(--text-secondary); flex: 0 0 auto;
+}
+
+/* ── Heatmap grid (corpus + single-syllabus views) ── */
+table.heatmap { border-collapse: separate; border-spacing: 2px; }
+table.heatmap th {
+  font-weight: 500; font-size: 0.76rem; color: var(--text-secondary);
+  padding: 2px 6px; text-align: right; white-space: nowrap; cursor: default;
+}
+table.heatmap thead th { text-align: center; vertical-align: bottom; width: 116px; min-width: 116px; white-space: normal; }
+table.heatmap th .cat-name { font-weight: 600; color: var(--text-primary); }
+table.heatmap th .cat-words {
+  font-weight: 400; font-size: 0.68rem; color: var(--text-muted);
+  white-space: normal; line-height: 1.25; margin-top: 1px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+table.heatmap tbody th { max-width: 150px; white-space: normal; vertical-align: middle; height: 62px; }
+table.heatmap th:hover .cat-name, table.heatmap th:focus .cat-name { text-decoration: underline dotted; }
+table.heatmap td.cell {
+  width: 116px; height: 62px; min-width: 100px;
+  text-align: center; font-size: 0.78rem; font-variant-numeric: tabular-nums;
+  border-radius: 4px; cursor: pointer; position: relative;
+}
+table.heatmap td.cell:hover, table.heatmap td.cell:focus {
+  outline: 2px solid var(--text-primary); outline-offset: -1px;
+}
+table.heatmap td.cell.na { color: var(--text-muted); cursor: default; background: transparent; border: 1px dashed var(--grid-hair); }
+
+/* ── Pairing view: stacked bars per year with word lists beside ── */
+.pair-flex { display: flex; align-items: flex-start; gap: 32px; flex-wrap: wrap; margin: 8px 0 4px; }
+.pair-chart-col { flex: 0 0 auto; }
+.chart-note { max-width: 52ch; }
+.pair-words { flex: 1 1 320px; min-width: 280px; max-width: 60ch; }
+.word-list { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; margin: 0 0 12px; }
+.word-list strong { color: var(--text-primary); font-weight: 600; }
+
+.bars-chart { margin: 8px 0 4px; overflow-x: auto; }
+.bars-row { display: flex; align-items: flex-end; gap: 30px; padding: 4px 8px; }
+.bar-col { display: flex; flex-direction: column; align-items: center; }
+.bar-stack { display: flex; flex-direction: column-reverse; gap: 2px; }
+.seg {
+  width: 40px; height: 13px; border-radius: 3px; cursor: pointer;
+  border: 1px solid var(--border-ring); padding: 0; font-size: 0;
+}
+.seg:hover, .seg:focus { outline: 2px solid var(--text-primary); outline-offset: -1px; }
+.bar-label { font-size: 0.82rem; color: var(--text-primary); font-weight: 600; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.bar-sublabel { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.table-title { font-size: 0.94rem; margin: 20px 0 4px; }
+.pair-words .cites-title { margin-top: 36px; }
+
+.drive-link {
+  font-size: 0.78rem; font-weight: 400; color: var(--accent);
+  text-decoration: none; margin-left: 8px; vertical-align: middle;
+}
+.drive-link:hover, .drive-link:focus { text-decoration: underline; }
+
+/* ── References list on the single-course view ── */
+ul.refs { margin: 6px 0 0; padding-left: 20px; font-size: 0.84rem; line-height: 1.55; max-width: 90ch; }
+ul.refs li { margin-bottom: 2px; }
+.ref-title { color: var(--text-primary); }
+.ref-author { color: var(--text-muted); }
+.ref-count { color: var(--text-muted); font-size: 0.78rem; }
+#tooltip .tt-cite { padding-left: 8px; }
+
+.legend { margin: 14px 0 2px; font-size: 0.76rem; color: var(--text-secondary); width: 420px; max-width: 100%; }
+.legend .bar { width: 100%; height: 10px; border-radius: 3px; border: 1px solid var(--border-ring); }
+.legend-labels { display: flex; justify-content: space-between; gap: 8px; margin-top: 3px; }
+.legend-labels .l-mid { text-align: center; }
+.legend-labels .l-right { text-align: right; }
+
+/* Top-syllabi table in cell view (no-hover relief channel) */
+table.rank { border-collapse: collapse; margin-top: 16px; font-size: 0.84rem; }
+table.rank th { text-align: left; color: var(--text-secondary); font-weight: 500; padding: 4px 14px 4px 0; border-bottom: 1px solid var(--grid-hair); }
+table.rank td { padding: 4px 14px 4px 0; border-bottom: 1px solid var(--grid-hair); font-variant-numeric: tabular-nums; }
+table.rank td.syl-link { color: var(--accent); cursor: pointer; }
+table.rank td.syl-link:hover, table.rank td.syl-link:focus { text-decoration: underline; }
+
+/* ── Tooltip ── */
+#tooltip {
+  position: fixed; z-index: 10; pointer-events: none;
+  background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--baseline); border-radius: 6px;
+  padding: 8px 10px; font-size: 0.8rem; max-width: 340px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+#tooltip .tt-value { font-weight: 700; font-size: 0.92rem; }
+#tooltip .tt-label { color: var(--text-secondary); }
+#tooltip .tt-list { margin: 6px 0 0; padding: 0; list-style: none; }
+#tooltip .tt-list li { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+#tooltip .tt-list .name { color: var(--text-secondary); }
+#tooltip hr { border: none; border-top: 1px solid var(--grid-hair); margin: 6px 0; }
+#tooltip .tt-words { margin-top: 4px; line-height: 1.4; }
+
+footer p { color: var(--text-muted); font-size: 0.76rem; line-height: 1.5; max-width: none; }
