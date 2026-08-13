@@ -80,7 +80,24 @@ function resize() {
   canvas.width = W * dpr; canvas.height = H * dpr;
   drawEdges();
 }
-window.addEventListener("resize", resize);
+// A plain window "resize" listener only catches the *window* resizing, but
+// this page is often embedded in an iframe whose own box can still be
+// settling (e.g. while the parent's flex layout resolves) after this script
+// starts running -- ResizeObserver reacts to #stage's actual box changing
+// for any reason. Resizing the canvas alone isn't enough though: fitView()
+// (called once from start(), below) computes the initial zoom/pan transform
+// from this same W/H, and if that ran against a stale measurement the view
+// stays permanently mis-zoomed/off-center even after the canvas itself
+// gets corrected -- which is also what made panning look broken (it was
+// working, just on content scaled/positioned way outside the visible area).
+// So keep re-fitting on every resize until boot has finished AND the user
+// hasn't actually touched the view yet (userInteracted, set in zoom's "zoom"
+// handler below) -- once either is true it stops touching their view.
+let booted = false;
+new ResizeObserver(() => {
+  resize();
+  if (booted && !userInteracted) fitView();
+}).observe(stage);
 
 /* ---------- visibility filters ---------- */
 let visibleNodes = [], visibleLinks = [], adjacency = new Map();
@@ -132,10 +149,15 @@ function fitView() {
 }
 
 /* ---------- zoom ---------- */
+let userInteracted = false;
 const zoom = d3.zoom()
   .scaleExtent([0.1, 14])
   .clickDistance(6) // distinguishes a drag-pan from a click, so panning never unfocuses a pin
   .on("zoom", (ev) => {
+    // ev.sourceEvent is null for programmatic transforms (fitView calling
+    // zoom.transform below) and set for real mouse/touch/wheel input --
+    // used to know when to stop auto-refitting on resize (see boot section).
+    if (ev.sourceEvent) userInteracted = true;
     transform = ev.transform;
     gNodes.attr("transform", transform);
     drawEdges();
@@ -604,5 +626,6 @@ function start() {
   drawEdges();
   renderLegend();
   loading.classList.add("done");
+  booted = true;
 }
 layoutChunk();

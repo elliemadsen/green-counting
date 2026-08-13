@@ -30,16 +30,19 @@ const SKIP_NAMES = new Set([".DS_Store", "covers_cache.json"]);
 const SKIP_EXT = new Set([".py", ".md"]);
 
 const PAGES = [
-  { src: path.join(SITE_SRC, "index.html"), out: path.join(DOCS, "index.html"), title: "Green Counting" },
+  {
+    src: path.join(SITE_SRC, "index.html"), out: path.join(DOCS, "index.html"),
+    title: "Green Counting", hasStyle: false, // CSS is inline in this one
+  },
   {
     src: path.join(SITE_SRC, "word_associations", "index.html"),
     out: path.join(DOCS, "word_associations", "index.html"),
-    title: "Verbs × Keywords in Architecture Syllabi",
+    title: "Verbs × Keywords in Architecture Syllabi", hasStyle: true,
   },
   {
     src: path.join(SITE_SRC, "bibliography", "index.html"),
     out: path.join(DOCS, "bibliography", "index.html"),
-    title: "Syllabus Citation Network",
+    title: "Syllabus Citation Network", hasStyle: true,
   },
 ];
 
@@ -97,7 +100,7 @@ function copyTree(srcDir, outDir) {
 
 // Client-side gate script, injected as a plain string (no template literals
 // inside, so it nests cleanly inside this file's own template literal).
-function gateScript(saltB64, ivB64, dataB64) {
+function gateScript(saltB64, ivB64, dataB64, hasStyle) {
   const lines = [
     '(function () {',
     '  "use strict";',
@@ -105,6 +108,13 @@ function gateScript(saltB64, ivB64, dataB64) {
     '  var SALT_B64 = "' + saltB64 + '";',
     '  var IV_B64 = "' + ivB64 + '";',
     '  var DATA_B64 = "' + dataB64 + '";',
+    "",
+    // Kick off style.css now, in parallel with password entry / decryption,
+    // so it's already cached by the time reveal() writes the real page --
+    // otherwise the browser fetches it fresh at that moment, which both
+    // flashes unstyled HTML and can make scripts in the real page measure
+    // layout before CSS has applied.
+    '  var stylePreload = ' + (hasStyle ? 'fetch("style.css").catch(function () {})' : "Promise.resolve()") + ";",
     "",
     "  function b64ToBytes(b64) {",
     "    var bin = atob(b64);",
@@ -122,7 +132,7 @@ function gateScript(saltB64, ivB64, dataB64) {
     "",
     "  function attempt(password, onFail) {",
     "    var enc = new TextEncoder();",
-    "    window.crypto.subtle",
+    "    var decrypted = window.crypto.subtle",
     '      .importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"])',
     "      .then(function (baseKey) {",
     "        return window.crypto.subtle.deriveKey(",
@@ -140,9 +150,9 @@ function gateScript(saltB64, ivB64, dataB64) {
     "          b64ToBytes(DATA_B64)",
     "        );",
     "      })",
-    "      .then(function (plainBuf) {",
-    "        reveal(new TextDecoder().decode(plainBuf), password);",
-    "      })",
+    "      .then(function (plainBuf) { return new TextDecoder().decode(plainBuf); });",
+    "    Promise.all([decrypted, stylePreload])",
+    "      .then(function (results) { reveal(results[0], password); })",
     "      .catch(onFail);",
     "  }",
     "",
@@ -177,7 +187,7 @@ function gateScript(saltB64, ivB64, dataB64) {
   return lines.join("\n");
 }
 
-function gateHtml(title, saltB64, ivB64, dataB64) {
+function gateHtml(title, saltB64, ivB64, dataB64, hasStyle) {
   return [
     "<!doctype html>",
     '<html lang="en">',
@@ -232,7 +242,7 @@ function gateHtml(title, saltB64, ivB64, dataB64) {
     "      </form>",
     "    </div>",
     "    <script>",
-    gateScript(saltB64, ivB64, dataB64),
+    gateScript(saltB64, ivB64, dataB64, hasStyle),
     "    </script>",
     "  </body>",
     "</html>",
@@ -251,7 +261,7 @@ function main() {
     const plaintext = fs.readFileSync(page.src, "utf8");
     const { salt, iv, data } = encrypt(plaintext, password);
     fs.mkdirSync(path.dirname(page.out), { recursive: true });
-    fs.writeFileSync(page.out, gateHtml(page.title, salt, iv, data));
+    fs.writeFileSync(page.out, gateHtml(page.title, salt, iv, data, page.hasStyle));
     console.log("gated:", path.relative(REPO_ROOT, page.out));
   }
 
