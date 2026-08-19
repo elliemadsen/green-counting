@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Images in Architecture Syllabi</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="viz-root">
+      <header>
+        <div class="page-col">
+          <h1>Visual Language</h1>
+          <p class="subtitle">
+            Every raster image embedded in the syllabi documents, including
+            photos, sections, diagrams, maps, and more. Excludes logos,
+            letterheads, and headshots. Arrange the images by year, color, or
+            syllabus. Click any image to see its source.
+            <button
+              type="button"
+              id="more-info-toggle"
+              class="more-info-toggle"
+            >
+              More information
+            </button>
+          </p>
+          <div id="more-info" class="more-info" hidden>
+            <p>
+              Images are kept only if they're placed at least 1 inch in both
+              dimensions on the page, aren't a thin banner or rule line, and
+              aren't a near-solid color block — a simple filter meant to drop
+              template graphics (letterhead, icons, dividers) while keeping
+              project photos, renderings, and diagrams. "Color" is each image's
+              average color. In the default By year and color view, grayscale
+              images are grouped separately, ordered dark to light; the By color
+              view instead sorts every image by hue, however faint, so a
+              faintly-tinted "grayish" image lands next to true-color images
+              that share its tint rather than off in its own group.
+            </p>
+          </div>
+          <div class="controls-row">
+            <div
+              id="arrange-toggle"
+              class="toggle-group"
+              role="group"
+              aria-label="Arrangement"
+            >
+              <button type="button" data-arrange="year-color" class="active">
+                By year and color
+              </button>
+              <button type="button" data-arrange="syllabus">By syllabus</button>
+              <button type="button" data-arrange="year">By year</button>
+              <button type="button" data-arrange="color">By color</button>
+            </div>
+            <div class="zoom-row">
+              <label for="zoom-slider" class="zoom-label">Size</label>
+              <input
+                type="range"
+                id="zoom-slider"
+                min="20"
+                max="180"
+                step="4"
+                value="29"
+              />
+            </div>
+            <div id="count" class="count"></div>
+          </div>
+        </div>
+      </header>
+
+      <main id="gallery" class="gallery"></main>
+
+      <div id="lightbox" class="lightbox" hidden>
+        <button type="button" id="lb-close" class="lb-close" aria-label="Close">
+          &times;
+        </button>
+        <button
+          type="button"
+          id="lb-prev"
+          class="lb-nav lb-prev"
+          aria-label="Previous image"
+        >
+          &#8249;
+        </button>
+        <button
+          type="button"
+          id="lb-next"
+          class="lb-nav lb-next"
+          aria-label="Next image"
+        >
+          &#8250;
+        </button>
+        <div class="lb-body">
+          <img id="lb-img" alt="" />
+          <div id="lb-info" class="lb-info"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="../word_associations/drive_ids.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

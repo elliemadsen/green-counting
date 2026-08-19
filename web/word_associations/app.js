@@ -262,6 +262,7 @@
   // .view sections just overflow-x: auto internally if their content
   // exceeds this shared width instead.
   let pageWidth = null;
+  let widthObserver = null;
 
   function applyPageWidth() {
     if (pageWidth == null) return;
@@ -278,14 +279,26 @@
     // that's visible.
     if (state.view === "cell") return;
     const ref = state.view === "syllabus" ? viewSyl : viewCorpus;
-    // Two rAFs: one for layout to settle after replaceChildren(), one more
-    // in case fonts/webfont metrics shift the measurement.
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const w = ref.getBoundingClientRect().width;
-      if (!w) return;
+    // ResizeObserver, not a one-shot rAF measurement: this page can be
+    // sitting in a background (display: none) iframe tab when it first
+    // loads -- e.g. this isn't the outer shell's default-active tab -- and
+    // a hidden element always measures 0 width. A single rAF check that
+    // gives up on 0 left .page-col/.view stuck at their plain CSS
+    // fit-content sizing forever (misaligned, since they can size
+    // differently), because nothing ever prompted a re-measure once the
+    // tab actually became visible. ResizeObserver instead keeps watching
+    // and fires again the moment the element's real layout size resolves,
+    // whenever that happens to be.
+    if (widthObserver) widthObserver.disconnect();
+    widthObserver = new ResizeObserver((entries) => {
+      const w = entries[0].contentRect.width;
+      if (!w) return; // still hidden -- keep watching
       pageWidth = w;
+      widthObserver.disconnect();
+      widthObserver = null;
       applyPageWidth();
-    }));
+    });
+    widthObserver.observe(ref);
   }
 
   function setView(view) {
@@ -807,32 +820,45 @@
   // narrow viewports shrink them with plain CSS.
 
   // Tell the parent shell (if embedded in one -- see web/index.html) to hide
-  // its tab bar while the user scrolls down through a view, and bring it
-  // back near the top or on scroll-up, instead of it sitting fixed above
-  // the content the whole time.
+  // its tab bar the moment the user scrolls down at all, and bring it back
+  // on any scroll-up, instead of it sitting fixed above the content the
+  // whole time.
   if (window.parent !== window) {
-    let lastY = window.scrollY, lastDir = "up", ticking = false;
+    let lastY = window.scrollY, lastDir = "up", ticking = false, lastFlip = 0;
+    // A 1px delta is sensitive enough to react to a small scroll, but real
+    // scroll input (trackpad momentum especially, right as it decelerates)
+    // isn't perfectly monotonic frame to frame -- without this cooldown,
+    // that sub-pixel jitter flips direction back and forth rapidly, which
+    // reads as the tab bar hiding, flickering, and reappearing instead of
+    // cleanly hiding once. The cooldown doesn't add perceptible delay to the
+    // FIRST flip after a real direction change, only to repeated flips.
+    const FLIP_COOLDOWN_MS = 200;
     const postDir = (dir) => {
       if (dir === lastDir) return; // only message the parent on an actual change
+      const now = performance.now();
+      if (now - lastFlip < FLIP_COOLDOWN_MS) return;
+      lastFlip = now;
       lastDir = dir;
-      window.parent.postMessage({ type: "gc-scroll", dir }, window.location.origin);
+      // "*": the parent shell identifies a trusted sender via ev.source
+      // (see web/index.html), not by matching this targetOrigin, so this
+      // doesn't need to (and shouldn't try to) predict the parent's origin.
+      window.parent.postMessage({ type: "gc-scroll", dir }, "*");
     };
     window.addEventListener("scroll", () => {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
         const y = Math.max(0, window.scrollY);
-        const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-        // Rubber-band overscroll bounces scrollY back and forth by a few px
-        // right at the top/bottom of the page, which kept flipping the
-        // direction (and so the tab bar) rapidly right when you hit the
-        // bottom -- always resolve to "show" near either edge instead of
-        // reading the bounce as a real scroll-up/down.
-        if (y <= 40 || y >= maxY - 40) {
+        // The bar reappears ONLY once the user is actually back at the top
+        // (y <= 6), not on any small upward scroll partway down -- so it
+        // hides on the way down and stays out of the way even while
+        // scrolling back and forth mid-page, only returning when you've
+        // scrolled all the way back to the start of the content.
+        if (y <= 6) {
           postDir("up");
         } else {
           const delta = y - lastY;
-          if (Math.abs(delta) > 4) postDir(delta > 0 ? "down" : "up");
+          if (delta > 1) postDir("down");
         }
         lastY = y;
         ticking = false;

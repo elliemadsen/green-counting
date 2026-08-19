@@ -1,0 +1,182 @@
+/* Fixed medium-grey canvas, deliberately NOT theme-aware (light/dark) --
+   a neutral mid-grey is the standard backdrop for judging photo color
+   (same reasoning a photo editor's canvas uses), so this page ignores the
+   site's usual light/dark palette on purpose. */
+.viz-root {
+  --bg: #a4a4a2;
+  --panel: #868685;
+  --tile-bg: #767672;
+  --ink: #ffffff;
+  --ink-secondary: #dcdcd8;
+  --accent: #d64219;
+  --hairline: rgba(255, 255, 255, 0.16);
+  /* Lightbox backdrop: a light, translucent veil over a blurred view of the
+     gallery (rather than a dark scsrim), plus dark text/controls to stay
+     legible against it -- see .lightbox below. */
+  --scrim: rgba(214, 214, 209, 0.55);
+  --lb-ink: #232320;
+  --lb-ink-secondary: #4c4c47;
+  --lb-accent: #d32f27;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: #a4a4a2; }
+
+.viz-root {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  min-height: 100%;
+  padding: 60px 40px 48px;
+}
+
+.page-col { max-width: 1480px; margin: 0 auto; }
+
+header h1 { font-size: 1.15rem; margin: 1.3rem 0 0; font-weight: 400; }
+.subtitle { color: var(--ink-secondary); font-size: 0.8rem; line-height: 1.45; margin: 0 0 0.4rem; max-width: 78ch; }
+
+.more-info-toggle {
+  font: inherit; font-size: 0.78rem; color: var(--accent); font-weight: 600;
+  background: none; border: none; padding: 0; margin-left: 4px; cursor: pointer;
+}
+.more-info-toggle:hover, .more-info-toggle:focus-visible { text-decoration: underline; }
+.more-info {
+  color: var(--ink-secondary); font-size: 0.8rem; line-height: 1.5; max-width: 78ch;
+  margin: 0 0 1.1rem; padding-top: 10px; border-top: 1px solid var(--hairline);
+}
+.more-info p { margin: 0; }
+
+.controls-row {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  margin: 10px 0 20px;
+}
+.toggle-group {
+  display: inline-flex; border: 1px solid var(--hairline); border-radius: 6px; overflow: hidden;
+}
+.toggle-group button {
+  font: inherit; font-size: 0.82rem; color: var(--ink-secondary);
+  background: var(--panel); border: none; padding: 6px 12px; cursor: pointer;
+}
+.toggle-group button + button { border-left: 1px solid var(--hairline); }
+.toggle-group button:hover { color: var(--ink); }
+.toggle-group button.active { background: var(--accent); color: var(--ink); }
+.count { font-size: 0.78rem; color: var(--ink-secondary); margin-left: auto; }
+
+.zoom-row { display: flex; align-items: center; gap: 8px; }
+.zoom-label { font-size: 0.78rem; color: var(--ink-secondary); }
+#zoom-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 120px; height: 4px; border-radius: 2px;
+  background: var(--panel); border: 1px solid var(--hairline);
+  cursor: pointer;
+}
+#zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: pointer;
+}
+#zoom-slider::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: pointer;
+}
+
+/* ── Gallery ── */
+.gallery { max-width: 1480px; margin: 0 auto; }
+
+/* Default arrangement: years run along the x axis, side by side, each one
+   internally scrolling its own color-sorted (y axis) column set. Other
+   arrangements (plain by-year, by-syllabus) keep the normal vertical stack
+   of block-level sections, which reads better for browsing. */
+#gallery[data-arrange="year-color"] {
+  display: flex; flex-direction: row; align-items: flex-start;
+  gap: 28px; overflow-x: auto; padding-bottom: 10px;
+}
+#gallery[data-arrange="year-color"] .year-block { flex: 0 0 auto; margin-bottom: 0; }
+
+.year-block { margin-bottom: 28px; }
+.year-block-head {
+  display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px;
+  font-size: 1.02rem; color: var(--ink);
+}
+.year-block-head .n { font-size: 0.76rem; color: var(--ink-secondary); font-variant-numeric: tabular-nums; }
+/* Every year's grid is the same fixed height (roughly one screen), with
+   however many auto-filled row tracks fit it at the current tile size;
+   grid-auto-flow: column then wraps into however many columns that year's
+   image count needs -- fewer columns for a smaller year, more for a
+   bigger one, but the same height for all of them. */
+.year-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--tile, 84px);
+  grid-template-rows: repeat(auto-fill, var(--tile, 84px));
+  height: 92vh;
+  gap: 3px;
+}
+
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile, 84px), 1fr));
+  gap: 3px;
+}
+
+.syl-block { margin-bottom: 22px; }
+.syl-block-head {
+  font-size: 0.86rem; color: var(--ink-secondary); margin: 0 0 6px;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.syl-block-head .n { color: var(--ink-secondary); font-size: 0.74rem; }
+.syl-grid {
+  display: flex; flex-wrap: wrap; gap: 3px;
+}
+
+.tile {
+  width: var(--tile, 84px); height: var(--tile, 84px);
+  padding: 0; border: none; cursor: pointer;
+  background: var(--tile-bg); overflow: hidden; position: relative;
+  display: block;
+}
+.tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile:hover, .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ── Lightbox: frosted-glass closeup -- blurs the gallery behind it instead
+   of hiding it under a dark scrim, so the closeup image reads as "zoomed
+   into" the page rather than a separate dark mode. Text/controls switch to
+   dark (--lb-*) since they now sit on a light backdrop. ── */
+.lightbox {
+  position: fixed; inset: 0; z-index: 20;
+  background: var(--scrim);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex; align-items: center; justify-content: center;
+}
+/* [hidden] has the same specificity as a class selector, so without this
+   override the rule above (unconditional display: flex) beats the browser's
+   built-in "[hidden] { display: none }" default and the lightbox stays
+   visible -- and clickable-but-inert -- over the whole page at all times. */
+.lightbox[hidden] { display: none; }
+.lb-body { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 92vw; max-height: 92vh; }
+.lb-body img { max-width: 92vw; max-height: 78vh; object-fit: contain; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }
+/* One row per syllabus this image belongs to -- just one row normally, or
+   one per syllabus in the group for a deduped By Color tile (see
+   renderColorSpectrum / renderLbInfo), every row formatted identically. */
+.lb-info { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 60ch; }
+.lb-info-row {
+  display: flex; align-items: baseline; gap: 14px;
+  color: var(--lb-ink-secondary); font-size: 0.86rem;
+}
+.lb-info-row .id { font-variant-numeric: tabular-nums; }
+.drive-link { color: var(--lb-accent); text-decoration: none; font-size: 0.86rem; font-weight: 600; }
+.drive-link:hover, .drive-link:focus { text-decoration: underline; }
+/* .lb-info-row's syllabus button, styled to match the .drive-link <a> beside it */
+.lb-link-btn { font: inherit; background: none; border: none; padding: 0; cursor: pointer; }
+
+.lb-close, .lb-nav {
+  position: fixed; background: transparent; border: none; color: var(--lb-ink);
+  font-size: 2rem; cursor: pointer; line-height: 1; padding: 10px;
+}
+.lb-close { top: 10px; right: 16px; font-size: 1.8rem; }
+.lb-nav { top: 50%; transform: translateY(-50%); font-size: 2.6rem; }
+.lb-prev { left: 6px; }
+.lb-next { right: 6px; }
+.lb-close:hover, .lb-nav:hover { color: var(--lb-accent); }

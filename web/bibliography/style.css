@@ -1,7 +1,7 @@
 /* chrome tokens (reference palette, palette.md) */
 :root {
   color-scheme: dark;
-  --surface: #1a1a19;
+  --surface: #474746;
   --page: #0d0d0d;
   --panel: rgba(37, 37, 36, 0.96); /* slightly lighter than the surface */
   --ink: #ffffff;
@@ -66,7 +66,7 @@ body {
 #topbar {
   position: absolute; top: 0; left: 0; right: 0; height: 52px;
   display: flex; align-items: center; justify-content: flex-end;
-  padding: 0 16px; pointer-events: none;
+  padding: 4rem 16px; pointer-events: none;
 }
 .topbar-buttons { display: flex; gap: 8px; pointer-events: all; }
 .topbar-buttons button {
@@ -80,7 +80,7 @@ body {
 
 /* sidebar */
 #sidebar {
-  position: absolute; top: 52px; right: 0; bottom: 0; width: 248px;
+  position: absolute; top: 6rem; right: 0; bottom: 0; width: 248px;
   background: var(--panel); border-left: 1px solid var(--hairline);
   padding: 16px; overflow-y: auto; backdrop-filter: blur(6px);
   transition: transform 0.25s ease;

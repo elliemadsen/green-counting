@@ -33,67 +33,130 @@
         --accent: #7fa89f;
       }
 
-      * { box-sizing: border-box; }
-      html, body {
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
         height: 100%;
         margin: 0;
-        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
         background: var(--page);
         color: var(--ink);
       }
-      body { display: flex; flex-direction: column; }
+      /* .tabbar and .panes both anchor directly to the viewport (position:
+         fixed) rather than stacking in flex flow, so .tabbar's hide/show
+         only ever animates transform + opacity -- compositor-only
+         properties that never trigger layout. An earlier version animated
+         max-height/padding-top instead, which forces a layout recompute on
+         every frame of the transition; that's real work competing with
+         whatever else is on the main thread, and was visibly choppier on
+         the images page specifically (a much heavier DOM -- a large image
+         grid -- leaves less headroom for it). .panes fills the full
+         viewport at all times now; .tabbar (opaque, higher z-index) simply
+         overlays its top edge while visible, which looks identical to the
+         old "content starts below the tab bar" layout since nothing shows
+         through an opaque tab bar anyway. */
+      body {
+        position: relative;
+      }
 
       /* ── Folder tabs ── */
       .tabbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 10;
         display: flex;
         gap: 4px;
         padding: 7px 12px 0;
-        background: #ffffff;
-        flex: 0 0 auto;
-        overflow: hidden;
-        max-height: 60px;
-        transition: max-height 0.2s ease, padding-top 0.2s ease, opacity 0.15s ease;
+        background: #e6e5e5;
+        /* The divider line, INSET so it's drawn inside the padding box
+           (same row the flex-stretched tabs already occupy) rather than
+           added on top of it -- a real border-bottom here would sit one
+           pixel further out, past where the tabs reach, so recoloring a
+           tab's own border couldn't mask it (a version that tried this
+           just left a thin colored sliver above an unbroken black line). */
+        box-shadow: inset 0 -1px 0 #000000;
+        transform: translateY(0);
+        transition:
+          transform 0.2s ease,
+          opacity 0.15s ease;
+        will-change: transform, opacity;
       }
-      /* Collapsed while an embedded page reports it's being scrolled down
-         (see the "gc-scroll" postMessage listener below), so it doesn't sit
-         frozen above the content the whole time. */
+      /* Slid fully off-screen while an embedded page reports it's being
+         scrolled down (see the "gc-scroll" postMessage listener below), so
+         it doesn't sit frozen above the content the whole time.
+         pointer-events: none so the (invisible, off-screen) bar can't
+         intercept clicks meant for the content now showing through where
+         it used to be. */
       .tabbar.tabbar-hidden {
-        max-height: 0;
-        padding-top: 0;
+        transform: translateY(-100%);
         opacity: 0;
+        pointer-events: none;
       }
       .tab {
         appearance: none;
         font: inherit;
-        font-size: 0.78rem;
+        font-size: 0.7rem;
         color: #333333;
         background: #ffffff;
         border: 1px solid #000000;
         border-radius: 6px 6px 0 0;
-        padding: 6px 14px;
+        padding: 4px 20px;
         cursor: pointer;
-        position: relative;
-        top: 1px;
       }
-      .tab:hover { color: #000000; }
-      .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+      .tab:hover {
+        color: #000000;
+      }
+      .tab:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+      }
 
-      /* Word Associations reads as part of the page behind it, always. */
-      #tab-words { background: var(--page); }
-      #tab-words[aria-selected="true"] { border-bottom-color: var(--page); }
+      /* Flex's default align-items: stretch makes every tab's own bottom
+         border sit exactly on top of .tabbar's inset shadow (same row) --
+         opaque, so it always paints over the shadow regardless of color.
+         For an unselected tab that border is black, same as the shadow, so
+         nothing looks different. For the SELECTED tab, recoloring that
+         border to match the tab's own background makes it stand out as a
+         gap in the divider right where the tab "plugs into" the content;
+         everywhere else (between/around tabs, where no tab's border
+         reaches) the shadow shows straight through as the continuous line. */
+      #tab-words {
+        background: var(--page);
+      }
+      #tab-words[aria-selected="true"] {
+        border-bottom-color: var(--page);
+      }
 
-      /* Bibliography Network opens onto its own dark page: only while
-         selected does its tab switch to that same dark grey; otherwise it
-         stays plain white like the other tab. */
-      #tab-biblio[aria-selected="true"] {
-        background: #1a1a19;
+      /* Bibliography Network and Images each open onto their own fixed page
+         background (see bibliography/style.css, images/style.css) -- their
+         tabs stay tinted to match at all times, selected or not, so the tab
+         itself previews which page it opens. */
+      #tab-biblio {
+        background: #474746;
         color: #ffffff;
-        border-color: #1a1a19;
+      }
+      #tab-biblio[aria-selected="true"] {
+        border-bottom-color: #474746;
+      }
+      #tab-images {
+        background: #a4a4a2;
+        color: #ffffff;
+      }
+      #tab-images[aria-selected="true"] {
+        border-bottom-color: #a4a4a2;
       }
 
       .panes {
-        flex: 1 1 auto;
-        min-height: 0;
+        position: fixed;
+        inset: 0;
         background: var(--surface);
       }
       iframe {
@@ -102,7 +165,9 @@
         border: none;
         display: none;
       }
-      iframe.active { display: block; }
+      iframe.active {
+        display: block;
+      }
     </style>
   </head>
   <body>
@@ -110,11 +175,23 @@
       <button
         class="tab"
         role="tab"
+        id="tab-images"
+        data-target="frame-images"
+        aria-selected="true"
+        aria-controls="frame-images"
+      >
+        Images
+      </button>
+      <button
+        class="tab"
+        role="tab"
         id="tab-words"
         data-target="frame-words"
-        aria-selected="true"
+        aria-selected="false"
         aria-controls="frame-words"
-      >Word Associations</button>
+      >
+        Word Associations
+      </button>
       <button
         class="tab"
         role="tab"
@@ -122,12 +199,21 @@
         data-target="frame-biblio"
         aria-selected="false"
         aria-controls="frame-biblio"
-      >Bibliography Network</button>
+      >
+        Bibliography Network
+      </button>
     </nav>
     <div class="panes">
       <iframe
-        id="frame-words"
+        id="frame-images"
         class="active"
+        role="tabpanel"
+        aria-labelledby="tab-images"
+        src="images/index.html#pw=__PASSWORD__"
+        title="Images in Architecture Syllabi"
+      ></iframe>
+      <iframe
+        id="frame-words"
         role="tabpanel"
         aria-labelledby="tab-words"
         src="word_associations/index.html#pw=__PASSWORD__"
@@ -149,17 +235,31 @@
         const tabbar = document.querySelector(".tabbar");
         tabs.forEach((tab) => {
           tab.addEventListener("click", () => {
-            tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
-            frames.forEach((f) => f.classList.toggle("active", f.id === tab.dataset.target));
+            tabs.forEach((t) =>
+              t.setAttribute("aria-selected", String(t === tab)),
+            );
+            frames.forEach((f) =>
+              f.classList.toggle("active", f.id === tab.dataset.target),
+            );
             tabbar.classList.remove("tabbar-hidden"); // switching tabs always shows the bar again
           });
         });
 
-        // Embedded pages (see word_associations/app.js) post their own scroll
-        // direction so the tab bar can hide while reading and come back on
-        // scroll-up, instead of sitting fixed above the content forever.
+        // Embedded pages (see word_associations/app.js and images/app.js;
+        // bibliography's page doesn't scroll, so it has no equivalent) post
+        // their own scroll direction so the tab bar can hide while reading
+        // and come back on scroll-up, instead of sitting fixed above the
+        // content forever. Identify a trusted sender by comparing ev.source
+        // against our own iframes' contentWindow (an object-identity check),
+        // NOT by comparing ev.origin as a string -- file:// pages get an
+        // opaque, inconsistently-stringified origin in most browsers, which
+        // silently dropped every one of these messages when testing locally
+        // by opening docs/index.html directly instead of over http(s).
+        const frameWindows = new Set(
+          Array.from(frames, (f) => f.contentWindow),
+        );
         window.addEventListener("message", (ev) => {
-          if (ev.origin !== window.location.origin) return;
+          if (!frameWindows.has(ev.source)) return;
           if (!ev.data || ev.data.type !== "gc-scroll") return;
           tabbar.classList.toggle("tabbar-hidden", ev.data.dir === "down");
         });
