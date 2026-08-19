@@ -15,17 +15,45 @@
             <span class="hl-kw">topic words</span>?
           </h1>
           <p class="subtitle">
-            This site reads 347 architecture course syllabi from 2020–2026,
-            sentence by sentence, and groups their
-            <span class="hl-verb">verbs</span> (what the course asks students to
-            do) and their <span class="hl-kw">keywords</span> (what the course
-            talks about) into categories. The heatmap shows which kinds of
-            <span class="hl-verb">doing</span> are associated with which kinds
-            of <span class="hl-kw">topics</span>. Hover over a cell to see the
-            courses that use that pairing most; click a cell to see how the
-            pairing has changed over time; click any course to see its full
-            profile.
+            This site reads 347 syllabi sentence by sentence and groups their
+            <span class="hl-verb">verbs</span> and
+            <span class="hl-kw">keywords</span> into categories. The heatmap
+            shows which kinds of <span class="hl-verb">doing</span> are
+            associated with which kinds of <span class="hl-kw">topics</span>.
+            Hover over a cell to see the courses that use that pairing most;
+            click a cell to see how the pairing has changed over time; click any
+            course to see its full profile.
+            <button
+              type="button"
+              id="more-info-toggle"
+              class="more-info-toggle"
+            >
+              More information
+            </button>
           </p>
+          <div id="more-info" class="more-info" hidden>
+            <h2>Implementation Details</h2>
+            <p>
+              Every syllabus was split into sentences and the quantity of words
+              in each verb and keyword category were counted. A sentence counts
+              toward a verb group when it uses one of that group's verbs, and
+              toward a keyword group when it mentions one of that group's topic
+              words. Words are lemmatized to match their dictionary base form,
+              and a word only counts as a keyword when it isn't being used as a
+              verb in that sentence — so "building a wall" counts as a verb,
+              while "the building" counts as a keyword. "Distinctiveness of
+              Association" compares how often two word groups actually share a
+              sentence with how often they would if the pairing were independent
+              — a methodology known as
+              <a
+                href="https://en.wikipedia.org/wiki/Pointwise_mutual_information"
+                target="_blank"
+                >Pointwise Mutual Information</a
+              >. The baseline is computed only over sentences that contain at
+              least one categorized word, so administrative boilerplate (dates,
+              grading policies, schedules) doesn't affect it.
+            </p>
+          </div>
           <div class="nav-row">
             <nav id="breadcrumb" aria-label="View navigation"></nav>
             <label id="syllabus-picker-label">
@@ -54,32 +82,6 @@
       </main>
 
       <div id="tooltip" role="tooltip" hidden></div>
-
-      <footer>
-        <div class="page-col">
-          <h2>Implementation Details</h2>
-          <p>
-            Every syllabus was split into sentences and the quantity of words in
-            each verb and keyword category were counted. A sentence counts
-            toward a verb group when it uses one of that group's verbs, and
-            toward a keyword group when it mentions one of that group's topic
-            words. Words are lemmatized to match their dictionary base form, and
-            a word only counts as a keyword when it isn't being used as a verb
-            in that sentence — so "building a wall" counts as a verb, while "the
-            building" counts as a keyword. "Distinctiveness of Association"
-            compares how often two word groups actually share a sentence with
-            how often they would if the pairing were independent — a methodology
-            known as
-            <a
-              href="https://en.wikipedia.org/wiki/Pointwise_mutual_information"
-              target="_blank"
-              >Pointwise Mutual Information</a
-            >. The baseline is computed only over sentences that contain at
-            least one categorized word, so administrative boilerplate (dates,
-            grading policies, schedules) doesn't affect it.
-          </p>
-        </div>
-      </footer>
     </div>
     <script src="data.js"></script>
     <script src="drive_ids.js"></script>

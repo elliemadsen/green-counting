@@ -253,50 +253,37 @@
   }
 
   // ── Breadcrumb + view switching ──────────────────────────────────────────
-  // The page has one static width for every view, taken from the corpus
-  // (all-categories) heatmap the first time it renders -- that width is
-  // stable across renders since it's driven entirely by the heatmap's
-  // fixed-width columns. Without this, the verb x keyword pairing view
-  // (view-cell) is naturally wider than the two heatmap views, and letting
-  // each view size itself made switching views resize the whole page; now
-  // .view sections just overflow-x: auto internally if their content
-  // exceeds this shared width instead.
-  let pageWidth = null;
+  // The header (.page-col) is kept the same width as whichever view is
+  // CURRENTLY showing, so the two always line up. An earlier version instead
+  // forced every view to a single shared width (taken from the corpus
+  // heatmap) so switching views wouldn't visibly resize the page -- but the
+  // verb x keyword pairing view (view-cell) is naturally wider than the
+  // heatmap, so forcing it into that narrower width made its own content
+  // overflow, which is what the .view overflow-x: auto was papering over
+  // with a horizontal scrollbar. Letting each view size itself (plain CSS
+  // width: fit-content, no JS-forced width) means nothing is ever narrower
+  // than its own content, so that scrollbar never needs to appear; the
+  // tradeoff is that the page can now change width when switching to/from
+  // view-cell specifically, which reads better than a scrollbar would.
+  const pageCol = $(".page-col");
   let widthObserver = null;
 
-  function applyPageWidth() {
-    if (pageWidth == null) return;
-    for (const el of document.querySelectorAll(".view, .page-col"))
-      el.style.width = pageWidth + "px";
-  }
-
   function syncPageWidth() {
-    if (pageWidth != null) { applyPageWidth(); return; }
-    // Corpus and single-syllabus both render the identical heatmap grid, so
-    // either is a valid width reference -- only the pairing view (view-cell)
-    // is the one we're normalizing away. A hash deep link can land on any
-    // view first (see applyHash), so this can't assume corpus is the one
-    // that's visible.
-    if (state.view === "cell") return;
-    const ref = state.view === "syllabus" ? viewSyl : viewCorpus;
+    const ref = state.view === "syllabus" ? viewSyl : state.view === "cell" ? viewCell : viewCorpus;
     // ResizeObserver, not a one-shot rAF measurement: this page can be
     // sitting in a background (display: none) iframe tab when it first
     // loads -- e.g. this isn't the outer shell's default-active tab -- and
     // a hidden element always measures 0 width. A single rAF check that
-    // gives up on 0 left .page-col/.view stuck at their plain CSS
-    // fit-content sizing forever (misaligned, since they can size
-    // differently), because nothing ever prompted a re-measure once the
-    // tab actually became visible. ResizeObserver instead keeps watching
-    // and fires again the moment the element's real layout size resolves,
-    // whenever that happens to be.
+    // gives up on 0 left .page-col stuck at its plain CSS fit-content sizing
+    // forever (misaligned, since it can size differently from the view),
+    // because nothing ever prompted a re-measure once the tab actually
+    // became visible. ResizeObserver instead keeps watching this view and
+    // re-applies its width to .page-col on every actual size change --
+    // whenever that happens to be, including a later browser window resize.
     if (widthObserver) widthObserver.disconnect();
     widthObserver = new ResizeObserver((entries) => {
       const w = entries[0].contentRect.width;
-      if (!w) return; // still hidden -- keep watching
-      pageWidth = w;
-      widthObserver.disconnect();
-      widthObserver = null;
-      applyPageWidth();
+      if (w) pageCol.style.width = w + "px";
     });
     widthObserver.observe(ref);
   }
@@ -799,6 +786,14 @@
     });
   }
 
+  const moreInfoToggle = $("#more-info-toggle");
+  const moreInfo = $("#more-info");
+  moreInfoToggle.addEventListener("click", () => {
+    const showing = moreInfo.hidden;
+    moreInfo.hidden = !showing;
+    moreInfoToggle.textContent = showing ? "Less information" : "More information";
+  });
+
   const picker = $("#syllabus-picker");
   D.syllabi
     .map((s, i) => ({ s, i }))
@@ -814,10 +809,6 @@
     state.cell = null;
     goSyllabus(Number(picker.value), true);
   });
-
-  // No resize listener needed: pageWidth is a fixed px value, and .view /
-  // .page-col both already have max-width: 100% in the stylesheet, so
-  // narrow viewports shrink them with plain CSS.
 
   // Tell the parent shell (if embedded in one -- see web/index.html) to hide
   // its tab bar the moment the user scrolls down at all, and bring it back

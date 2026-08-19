@@ -28,14 +28,13 @@
             <p>
               Images are kept only if they're placed at least 1 inch in both
               dimensions on the page, aren't a thin banner or rule line, and
-              aren't a near-solid color block — a simple filter meant to drop
-              template graphics (letterhead, icons, dividers) while keeping
-              project photos, renderings, and diagrams. "Color" is each image's
-              average color. In the default By year and color view, grayscale
-              images are grouped separately, ordered dark to light; the By color
-              view instead sorts every image by hue, however faint, so a
-              faintly-tinted "grayish" image lands next to true-color images
-              that share its tint rather than off in its own group.
+              aren't a near-solid color block. This filter drops template
+              graphics such as letterhead, icons, and dividers while keeping
+              project photos, renderings, and diagrams. Color is each image's
+              average color, sorted by hue. In <em>By color</em>, images are
+              de-duplicated such that the same image included under various
+              syllabi from different years appears only once. Upon close-up, the
+              syllabi in which the image appears are listed.
             </p>
           </div>
           <div class="controls-row">
@@ -45,12 +44,14 @@
               role="group"
               aria-label="Arrangement"
             >
-              <button type="button" data-arrange="year-color" class="active">
-                By year and color
+              <button type="button" data-arrange="color" class="active">
+                By color
               </button>
               <button type="button" data-arrange="syllabus">By syllabus</button>
               <button type="button" data-arrange="year">By year</button>
-              <button type="button" data-arrange="color">By color</button>
+              <button type="button" data-arrange="year-color">
+                By year and color
+              </button>
             </div>
             <div class="zoom-row">
               <label for="zoom-slider" class="zoom-label">Size</label>

@@ -18,19 +18,13 @@
     return node;
   }
 
-  // Sort key for the Year x Color view's y axis: hue around the wheel
-  // (0-1), except near-grayscale images (hue is meaningless once saturation
-  // is low) sort into their own bucket before any hue, ordered dark -> light.
-  function colorKey(img) {
-    if (img.sat < 0.12) return -2 + img.light;
-    return img.hue / 360;
-  }
-
-  // Sort key for the standalone Color Spectrum view: always hue-first, with
-  // no separate grayscale bucket -- even a faintly-tinted "grayish" image
-  // keeps its own (if faint) hue, so it lands next to true-color images
-  // that share that tint instead of being segregated away from them just
-  // for having low saturation. Lightness is the tie-break within a hue.
+  // Sort key for "color" -- used for both the Year x Color view's y axis
+  // and the standalone Color Spectrum view, so the two read consistently:
+  // always hue-first, with no separate grayscale bucket. Even a
+  // faintly-tinted "grayish" image keeps its own (if faint) hue, so it
+  // lands next to true-color images that share that tint instead of being
+  // segregated away from them just for having low saturation. Lightness is
+  // the tie-break within a hue.
   function spectrumKey(img) {
     return img.hue / 360;
   }
@@ -69,7 +63,7 @@
     gallery.dataset.arrange = "year-color";
     const order = [];
     for (const y of yearsPresent()) {
-      const imgs = IMAGES.filter((i) => i.year === y).sort((a, b) => colorKey(a) - colorKey(b));
+      const imgs = IMAGES.filter((i) => i.year === y).sort((a, b) => spectrumKey(a) - spectrumKey(b) || a.light - b.light);
       if (!imgs.length) continue;
       const block = el("div", "year-block");
       const head = el("div", "year-block-head");
@@ -358,5 +352,5 @@
   const nSyllabi = new Set(IMAGES.map((i) => i.syllabus_id)).size;
   $("#count").textContent = `${IMAGES.length} images from ${nSyllabi} syllabi`;
   gallery.style.setProperty("--tile", $("#zoom-slider").value + "px");
-  renderYearColor();
+  renderColorSpectrum();
 })();

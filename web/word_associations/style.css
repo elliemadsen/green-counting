@@ -76,12 +76,25 @@ body { background: #f2f2ef; }
 }
 
 header h1 { font-size: 1.15rem; margin: 1.3rem 0 0; font-weight: 400; }
-.subtitle { color: var(--text-secondary); font-size: 0.78rem; line-height: 1.45; margin: 0 0 2rem; }
-.subtitle code, footer code { font-size: 0.82em; background: var(--surface-1); border: 1px solid var(--border-ring); border-radius: 3px; padding: 0 3px; }
+.subtitle { color: var(--text-secondary); font-size: 0.78rem; line-height: 1.45; margin: 0 0 0.4rem; max-width: 50vw; }
+.subtitle code, .more-info code { font-size: 0.82em; background: var(--surface-1); border: 1px solid var(--border-ring); border-radius: 3px; padding: 0 3px; }
+
+.more-info-toggle {
+  font: inherit; font-size: 0.78rem; color: var(--accent); font-weight: 400;
+  background: none; border: none; padding: 0; margin-left: 4px; cursor: pointer;
+}
+.more-info-toggle:hover, .more-info-toggle:focus-visible { text-decoration: underline; }
+.more-info {
+  color: var(--text-secondary); font-size: 0.78rem; line-height: 1.45; max-width: 50vw;
+  margin: 0 0 2rem; padding-top: 14px; border-top: 1px solid var(--border-ring);
+}
+.more-info h2 { font-size: 1rem; margin: 0 0 0.6rem; font-weight: 400; color: var(--text-primary); }
+.more-info p { margin: 0; }
+.more-info a { color: var(--accent); }
 
 .nav-row {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 18px; flex-wrap: wrap; margin: 6px 0 10px;
+  gap: 18px; flex-wrap: wrap; margin: 50px 0 10px;
 }
 #breadcrumb { font-size: 0.85rem; color: var(--text-muted); min-height: 1.4em; }
 #breadcrumb a { color: var(--accent); cursor: pointer; text-decoration: none; }
@@ -106,18 +119,19 @@ header h1 { font-size: 1.15rem; margin: 1.3rem 0 0; font-weight: 400; }
 
 .view {
   background: var(--surface-1); border: 1px solid var(--border-ring); border-radius: 8px;
-  padding: 18px; overflow-x: auto;
-  /* Every view hugs its own content width instead of stretching to the
-     page's max-width, and centers itself — the header/footer are then
-     synced to match this width in JS (see syncPageWidth in app.js), so
-     the whole page reads as one consistently-wide, centered column. */
+  padding: 18px;
+  /* Every view hugs its own content width (fit-content, no forced narrower
+     width) and centers itself, so it's never narrower than its own content
+     and never needs to scroll -- the header is then synced in JS to match
+     whichever width that turns out to be (see syncPageWidth in app.js), so
+     the two always line up. */
   width: fit-content; max-width: 100%; margin: 0 auto;
 }
 .view h2 { font-size: 1.2rem; font-weight: 400; margin: 0 0 4px; }
 .view-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
 .view .view-sub { color: var(--text-secondary); font-size: 0.84rem; margin: 0 0 14px; max-width: 78ch; }
 
-/* Header/footer inner wrapper: width is set in px by app.js's syncPageWidth()
+/* Header's inner wrapper: width is set in px by app.js's syncPageWidth()
    to match the currently visible .view, then centered here. Falls back to
    fit-content (its own natural width) before JS runs on first paint. */
 .page-col { width: fit-content; max-width: 100%; margin: 0 auto; }
@@ -246,6 +260,3 @@ table.rank th:not(:first-child), table.rank td:not(:first-child) { width: 15%; }
 #tooltip .tt-list .name { color: var(--text-secondary); }
 #tooltip hr { border: none; border-top: 1px solid var(--grid-hair); margin: 6px 0; }
 #tooltip .tt-words { margin-top: 4px; line-height: 1.4; }
-
-footer p { color: var(--text-muted); font-size: 0.76rem; line-height: 1.5; max-width: none; }
-footer h2 { font-size: 1.1rem; margin: 2rem 0 0; font-weight: 400;}
