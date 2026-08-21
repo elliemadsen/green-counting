@@ -16,7 +16,7 @@ Four independent, self-contained scripts:
 | `verb_noun_occurrence_analysis.py` | Which nouns does a given verb tend to appear alongside — e.g. does "analyze" really co-occur with "climate"? |
 | `verb_category_noun_trends_analysis.py` | For a whole category of verbs (not one verb at a time), how does its noun profile shift year by year — e.g. what does the "doing" category get done *to* in 2020 vs. 2026? |
 | `verb_category_keyword_category_analysis.py` | Does a syllabus's *topic* vocabulary (theoretical, quantitative, economic, … per `data/Categories.csv`) predict which *verb* vocabulary it leans on — e.g. does "theoretical" language really pair with "positioning" verbs more than "questioning" verbs? |
-| `verb_keyword_per_syllabus.py` | Same scan as the script above, but tallied **per syllabus** instead of pooled corpus-wide. Generates `../WordAssociations/data.js` for the interactive explorer (below), not a report. |
+| `verb_keyword_per_syllabus.py` | Same scan as the script above, but tallied **per syllabus** instead of pooled corpus-wide. Generates `../web/word_associations/data.js` for the interactive explorer (below), not a report. |
 
 All four tag the **raw, unfiltered** `full_text` column of `data/syllabi_text.csv` with
 spaCy (`en_core_web_sm`) — see §0 below for why that matters, and why no changes to step
@@ -43,7 +43,7 @@ re-running the others.
 | `verb_categories.txt` | Curated thematic verb categories. One category per line: `label` TAB `comma, separated, verb, lemmas` (same shape as `data/go-words.txt`). Any verb lemma not listed defaults to `misc`. Hand-edit and re-run — no retraining or reclustering step. |
 | `stopverbs.txt` | Generic/administrative verb lemmas (one per line) excluded from the *content*-verb counts — still counted toward active/passive totals, since e.g. passive "attendance is required" is a genre feature worth keeping, not noise. Currently a small placeholder starter list; expand as needed. |
 | `outputs/` | All generated CSVs and markdown reports (see table below) |
-| `../WordAssociations/` | Interactive browser version of the verb×keyword heatmaps (same `data.js` pattern as `bibliography/`). Open `WordAssociations/index.html` (top-level folder) in a browser: corpus PMI/count grid → hover a cell for the top syllabi driving it → click for that pairing across all 347 syllabi (grouped by year) → click any syllabus for its own full heatmap, colored by log₂ enrichment vs the corpus baseline. Regenerate its data with `python3 verb_keyword_per_syllabus.py` after editing `verb_categories.txt` or `data/Categories.csv`. Corpus-level numbers were verified to match `outputs/verb_category_keyword_category.csv` exactly. |
+| `../web/word_associations/` | Interactive browser version of the verb×keyword heatmaps (same `data.js` pattern as `bibliography/`). Open `web/word_associations/index.html` in a browser: corpus PMI/count grid → hover a cell for the top syllabi driving it → click for that pairing across all 347 syllabi (grouped by year) → click any syllabus for its own full heatmap, colored by log₂ enrichment vs the corpus baseline. Regenerate its data with `python3 verb_keyword_per_syllabus.py` after editing `verb_categories.txt` or `data/Categories.csv`. Corpus-level numbers were verified to match `outputs/verb_category_keyword_category.csv` exactly. |
 
 ## Output files
 

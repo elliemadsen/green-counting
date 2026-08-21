@@ -306,6 +306,7 @@ _FALSE_POSITIVE_TITLES = re.compile(
 _KNOWN_JOURNALS = [
     'Architectural Record', 'Architecture + Urbanism',
     "Architect's Journal", 'Journal of Architecture',
+    'Journal of Architectural Education',
     'Log', 'AA Files', 'e-flux', 'Perspecta',
     'Critical Inquiry', 'Environmental History', 'Assemblage',
     'Grey Room', 'New Left Review', 'October', 'Representations',
@@ -653,6 +654,33 @@ def author_match_key(name: str) -> str:
     surname = tokens[-1].lower().strip('.,')
     first_initial = tokens[0][0].lower() if tokens[0] else ''
     return f'{surname}|{first_initial}'
+
+
+# Journal/publisher names that show up under multiple guises depending on how
+# a syllabus cites them (abbreviation, "The " prefix, sub-imprint name, …).
+# Keyed on the lowercased/stripped raw value, mapped to the canonical display
+# name so charts and vote-based dedup treat every variant as one entity.
+_JOURNAL_ALIASES = {
+    'jae': 'Journal of Architectural Education',
+    'places': 'Places Journal',
+    'e-flux architecture': 'e-flux',
+}
+
+_PUBLISHER_ALIASES = {
+    'the mit press': 'MIT Press',
+}
+
+
+def canonicalize_journal(name: str | None) -> str | None:
+    if not name:
+        return name
+    return _JOURNAL_ALIASES.get(name.strip().lower(), name.strip())
+
+
+def canonicalize_publisher(name: str | None) -> str | None:
+    if not name:
+        return name
+    return _PUBLISHER_ALIASES.get(name.strip().lower(), name.strip())
 
 
 # Titles known to fuzzy-match a genuinely different work above the 0.87
@@ -1555,6 +1583,8 @@ def main():
         for cit in entry.get('citations', []):
             cit['source_pdf']  = pdf_stem
             cit['source_year'] = year
+            cit['journal']     = canonicalize_journal(cit.get('journal'))
+            cit['publisher']   = canonicalize_publisher(cit.get('publisher'))
             flat.append(cit)
 
     print(f"Total raw citations across all syllabi: {len(flat)}")

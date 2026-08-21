@@ -190,8 +190,18 @@
     btn.addEventListener("click", () => setArrangement(btn.dataset.arrange));
   }
   const zoomSlider = $("#zoom-slider");
+  // "input" can fire far more often than the browser can repaint, and each
+  // update forces a grid reflow across every tile (up to 850 images) since
+  // --tile drives grid-auto-columns/grid-template-rows. Coalescing to one
+  // write per animation frame keeps the thumb tracking the mouse smoothly
+  // instead of falling behind mid-drag.
+  let zoomFrame = null;
   zoomSlider.addEventListener("input", () => {
-    gallery.style.setProperty("--tile", zoomSlider.value + "px");
+    if (zoomFrame !== null) return;
+    zoomFrame = requestAnimationFrame(() => {
+      gallery.style.setProperty("--tile", zoomSlider.value + "px");
+      zoomFrame = null;
+    });
   });
 
   // Jumps to the By Syllabus view, scrolled to one syllabus's cluster --

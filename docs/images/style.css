@@ -3,17 +3,17 @@
    (same reasoning a photo editor's canvas uses), so this page ignores the
    site's usual light/dark palette on purpose. */
 .viz-root {
-  --bg: #a4a4a2;
-  --panel: #868685;
-  --tile-bg: #767672;
-  --ink: #ffffff;
-  --ink-secondary: #dcdcd8;
-  --accent: #d64219;
-  --hairline: rgba(255, 255, 255, 0.16);
+  --bg: #ffffff;
+  --panel: #dedede;
+  --tile-bg: #b8b8b8;
+  --ink: #000000;
+  --ink-secondary: #686868;
+  --accent: #ef5024;
+  --hairline: rgba(0, 0, 0, 0.16);
   /* Lightbox backdrop: a light, translucent veil over a blurred view of the
      gallery (rather than a dark scsrim), plus dark text/controls to stay
      legible against it -- see .lightbox below. */
-  --scrim: rgba(214, 214, 209, 0.55);
+  --scrim: rgba(244, 244, 219, 0.55);
   --lb-ink: #232320;
   --lb-ink-secondary: #4c4c47;
   --lb-accent: #d32f27;
@@ -21,7 +21,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-body { background: #a4a4a2; }
+body { background: #ffffff; }
 
 .viz-root {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;

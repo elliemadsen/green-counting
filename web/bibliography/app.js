@@ -388,11 +388,37 @@ function el(tag, cls, text) {
   if (text !== undefined) e.textContent = text;
   return e;
 }
+// Syllabus stems here have no "nb" suffix (3_bibliography_analysis.py parses
+// the FULL PDFs), while DRIVE_IDS -- shared with ../images/app.js and
+// ../word_associations/app.js -- is keyed by the "nb" stem, so it maps
+// straight to the full PDF's Drive file id. Falls back to a Drive search
+// when a syllabus has no mapped entry.
+function syllabusLink(stem) {
+  const driveId = (window.DRIVE_IDS || {})[stem + "nb"];
+  const a = document.createElement("a");
+  a.className = "tt-syl-link";
+  a.textContent = stem;
+  a.href = driveId
+    ? "https://drive.google.com/file/d/" + driveId + "/view"
+    : "https://drive.google.com/drive/search?q=" + encodeURIComponent(stem);
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.title = driveId
+    ? "Opens this syllabus PDF directly — requires Drive access"
+    : "Searches the shared Google Drive for this syllabus — requires Drive access";
+  return a;
+}
 function syllabiLine(list) {
   const cap = 24;
-  const shown = list.slice(0, cap).join("; ");
+  const shown = list.slice(0, cap);
   const extra = list.length > cap ? ` … +${list.length - cap} more` : "";
-  return el("div", "tt-syllabi", shown + extra);
+  const div = el("div", "tt-syllabi");
+  shown.forEach((s, i) => {
+    if (i > 0) div.appendChild(document.createTextNode("; "));
+    div.appendChild(syllabusLink(s));
+  });
+  if (extra) div.appendChild(document.createTextNode(extra));
+  return div;
 }
 function showNodeTooltip(ev, d) {
   tooltip.style.transform = ""; // full size by default; pinned callers rescale after

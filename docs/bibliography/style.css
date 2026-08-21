@@ -164,6 +164,14 @@ body {
   margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.5;
   border-top: 1px solid var(--hairline); padding-top: 5px;
 }
+/* Tooltip itself is pointer-events:none (so it never blocks the node/canvas
+   underneath); re-enable just the links, which only need to be clickable
+   while a node is pinned and the tooltip stays put. */
+#tooltip .tt-syl-link {
+  pointer-events: auto; color: var(--muted); text-decoration: none;
+  border-bottom: 1px dotted var(--muted); cursor: pointer;
+}
+#tooltip .tt-syl-link:hover { color: var(--ink); border-bottom-color: var(--ink); }
 #tooltip .tt-key {
   display: inline-block; width: 14px; height: 0; border-top: 2.5px solid;
   vertical-align: middle; margin-right: 6px; border-radius: 2px;

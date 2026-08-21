@@ -7,10 +7,10 @@ module docstring for the method), except co-occurrence tallies are kept
 per syllabus instead of pooled corpus-wide.
 
 Output is not a report but a data file for the interactive heatmap
-explorer in ../WordAssociations/ (same build_data.py -> data.js pattern as
-the bibliography/ visualization):
+explorer in ../web/word_associations/ (same build_data.py -> data.js pattern
+as the bibliography/ visualization):
 
-  ../WordAssociations/data.js  window.VK_DATA = { verb_cats, kw_cats,
+  ../web/word_associations/data.js  window.VK_DATA = { verb_cats, kw_cats,
                               corpus totals, per-syllabus tallies }
 
 All derived statistics (PMI, per-100-sentence rates, enrichment vs the
@@ -38,7 +38,7 @@ BASE_DIR         = pathlib.Path(__file__).parent
 INPUT_CSV        = BASE_DIR.parent / "data" / "syllabi_text.csv"
 VERB_CATS_FILE   = BASE_DIR / "verb_categories.txt"
 KEYWORD_CATS_CSV = BASE_DIR.parent / "data" / "Categories.csv"
-OUT_DIR          = BASE_DIR.parent / "WordAssociations"
+OUT_DIR          = BASE_DIR.parent / "web" / "word_associations"
 OUT_DIR.mkdir(exist_ok=True)
 OUT_DATA         = OUT_DIR / "data.js"
 
