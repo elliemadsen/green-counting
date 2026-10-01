@@ -8,7 +8,7 @@ applies both stopword lists, and writes:
   outputs/top500_corpus.csv       — top 500 words across all years (rank, word, count)
   outputs/top100_per_year.csv     — top 100 words per year (long format: year, rank, word, count)
   outputs/keywords_corpus.csv     — per-keyword counts from data/keywords.txt (corpus + per year)
-  0_preprocessing.md              — output summary (generated)
+  README.md                       — output summary (generated)
 
 Stopword lists in stopwords/:
   stopwords.txt   — general English stopwords
@@ -46,7 +46,7 @@ OUTPUT_CSV      = DATA_DIR / "syllabi_text.csv"
 OUT_TOP500_ALL  = OUT_DIR / "top500_corpus.csv"
 OUT_TOP100_YEAR = OUT_DIR / "top100_per_year.csv"
 OUT_KEYWORDS    = OUT_DIR / "keywords_corpus.csv"
-OUT_MD             = BASE_DIR / "0_preprocessing.md"
+OUT_MD             = BASE_DIR / "README.md"
 KEYWORDS_FILE_2 = DATA_DIR / "keywords-2.txt"
 OUT_KEYWORDS_2  = OUT_DIR / "keywords-2_corpus.csv"
 
